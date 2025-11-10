@@ -3,7 +3,7 @@
 from .user import User
 from .plan import Plan, Subscription
 from .usage import UsageLog
-from .payment import Payment
+from .payment import PaymentTransaction
 from .file import File
 from .job import Job
 
@@ -12,7 +12,7 @@ __all__ = [
     "Plan",
     "Subscription",
     "UsageLog",
-    "Payment",
+    "PaymentTransaction",
     "File",
     "Job",
 ]

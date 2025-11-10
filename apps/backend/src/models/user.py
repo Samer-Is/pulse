@@ -27,7 +27,7 @@ class User(Base):
     subscription = relationship("Subscription", back_populates="user", uselist=False)
     usage_logs = relationship("UsageLog", back_populates="user")
     files = relationship("File", back_populates="user")
-    payments = relationship("Payment", back_populates="user")
+    payments = relationship("PaymentTransaction", back_populates="user")
     jobs = relationship("Job", back_populates="user")
     
     def __repr__(self):
