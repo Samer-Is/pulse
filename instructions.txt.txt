@@ -1,0 +1,586 @@
+
+
+CURSOR MASTER BUILD PROMPT — “Pulse AI Studio” — AWS, Zero-Touch
+
+You are building AI Studio: an Arabic-first, all-in-one AI workspace for Jordan priced at 3/5/7 JDs.
+Ship a working MVP with no manual AWS console work (Terraform + GitHub Actions OIDC).
+Continuously log everything to /docs/ACTIVITY.md and gate delivery via /docs/CHECKLIST.md.
+
+0) Product Scope (v1)
+
+Core tabs in the app (visible in sidebar + top nav):
+
+AI Chat (multi-model dropdown: GPT-4/5, Claude 4.5, Gemini Pro, and exposed names; default OpenAI)
+
+CV Maker (guided form → ATS-friendly CV in Arabic/English; export PDF/DOCX)
+
+Slide Maker (prompt → slides → export PPTX/PDF)
+
+Image (Editor + Generator) — model dropdown includes Nano Banana and fallback (Replicate/Stability)
+
+Video (Editor + Generator) — model dropdown includes Veo3 (stub if SDK private) and fallback (Pika/Runway stub)
+
+Plans & Limits (seed in DB):
+
+Starter (3 JD): 150k tokens/mo, 10 images, 0–2 short videos
+
+Pro (5 JD): 400k tokens, 30 images, 5 short videos, PDF summary + Slide Maker
+
+Creator (7 JD): 1M tokens, 60 images, 10 short videos, long prompts & advanced editors
+Add-ons: 1 JD → +200k tokens or +10 images or +1 video
+
+Payment: HyperPay driver (test mode), abstraction for PayTabs / ZainCash (stubs).
+Auth: Email magic link (SES); SMS OTP abstraction placeholder.
+Usage: Strict per-plan metering, 80% warn, 100% hard stop.
+
+1) Architecture (final)
+
+Frontend: Next.js 15 (App Router), TypeScript, Tailwind, shadcn/ui, React Query
+
+Backend API: FastAPI (Python 3.11) — auth, plans, payments, usage, files, CV/Slides generation orchestration
+
+AI Gateway: FastAPI (Python) — model router + usage metering + rate limiting; providers:
+
+OpenAI (GPT-4/5), Anthropic (Claude 4.5), Google (Gemini)
+
+Nano Banana (images) — integrate official SDK if exists; else REST client stub with env-config endpoints
+
+Veo3 (video) — same approach (SDK or REST client stub)
+
+Replicate/Stability/Pika as fallbacks
+
+Async Worker: Python (payments webhooks, video jobs, thumbnailing, analytics)
+
+DB: Aurora PostgreSQL Serverless v2
+
+Cache/Rate-limit: ElastiCache Redis
+
+Storage: S3 (assets, quarantine) + presigned URLs
+
+Containers: Docker → ECR → ECS Fargate (frontend, backend, gateway, worker)
+
+Network: VPC (3 AZ), ALB → ECS services (private subnets), NAT for egress
+
+CDN: CloudFront for frontend + media
+
+Email: SES (magic link).
+
+Secrets: AWS Secrets Manager (all API keys + DSNs)
+
+TLS/Domain: ACM + Route 53 (optional; default to ALB/CF domains)
+
+Observability: CloudWatch logs/metrics, X-Ray traces, JSON logs with trace_id
+
+Non-functional: P95 chat latency < 2.5s; structured logs; content moderation stub.
+
+2) Monorepo Layout
+ai-studio/
+  .editorconfig
+  .gitignore
+  .gitattributes
+  README.md
+  SECURITY.md
+  LICENSE
+  docker/
+    backend.Dockerfile
+    gateway.Dockerfile
+    frontend.Dockerfile
+    worker.Dockerfile
+  apps/
+    frontend/
+      app/
+        (routes) /(landing), /app/chat, /app/cv, /app/slides, /app/image, /app/video, /app/account
+      components/
+        ModelSelector.tsx
+        TokenMeter.tsx
+        PlanCard.tsx
+        PayButton.tsx
+        UsageBadge.tsx
+        Editors/{ImageEditor.tsx, VideoEditor.tsx}
+        Forms/{CvForm.tsx, SlidesForm.tsx}
+      lib/
+      public/demo/
+      styles/
+      next.config.js
+      package.json
+      tsconfig.json
+      tailwind.config.ts
+      postcss.config.js
+      .env.example
+    backend/
+      src/
+        main.py
+        api/v1/{auth.py, payments.py, usage.py, plans.py, files.py, cv.py, slides.py}
+        core/{config.py, security.py, db.py, logging.py, dependencies.py}
+        models/{user.py, plan.py, usage.py, payment.py, file.py, job.py}
+        schemas/{auth.py, payments.py, plans.py, usage.py, files.py, cv.py, slides.py}
+        services/{emails.py, files.py, slides_pptx.py, cv_docx.py}
+        services/payments/{base.py, hyperpay.py, paytabs.py, zaincash.py}
+        migrations/
+      pyproject.toml
+      .env.example
+    gateway/
+      src/
+        main.py
+        core/{config.py, logging.py, rate_limit.py, provider_router.py, usage_meter.py, moderation.py}
+        providers/{openai_client.py, anthropic_client.py, google_client.py, nano_banana_client.py, veo3_client.py, replicate_client.py}
+        routes/{chat.py, images.py, video.py}
+        models/{usage_log.py}
+        schemas/{chat.py, images.py, video.py}
+      pyproject.toml
+      .env.example
+    worker/
+      src/
+        main.py
+        jobs/{payments_webhooks.py, video_finalize.py, analytics.py, cleanup.py}
+      pyproject.toml
+      .env.example
+  infra/
+    terraform/
+      backend.tf              # S3 state + Dynamo lock
+      versions.tf
+      providers.tf
+      variables.tf
+      terraform.tfvars.example
+      outputs.tf
+      main.tf                 # root wiring; bootstraps state if missing
+      modules/
+        vpc/
+        ecr/
+        ecs/
+        alb/
+        rds/
+        redis/
+        s3/
+        cloudfront/
+        acm/
+        route53/
+        ses/
+        iam/
+        secrets/
+        observability/
+  scripts/
+    dev_bootstrap.sh
+    update_ecs_images.sh
+    format_check.sh
+    lint_check.sh
+  .github/
+    workflows/
+      infra.yml
+      app.yml
+  docs/
+    ARCHITECTURE.md
+    RUNBOOK.md
+    MARKETING_PLAYBOOK.md
+    API_CONTRACTS.md
+    CHECKLIST.md
+    ACTIVITY.md
+
+
+Rule: After every significant step, append to /docs/ACTIVITY.md: what ran, errors, fixes, commit, CI links, endpoints.
+
+3) UI/UX Requirements
+
+Arabic by default, English toggle.
+
+Sidebar (fixed): Chat, CV, Slides, Image, Video, Account.
+
+Model dropdown shown in Chat, Image, Video pages.
+
+Chat models: GPT-4/5, Claude 4.5, Gemini Pro.
+
+Image models: Nano Banana (default), fallback Replicate/Stability.
+
+Video models: Veo3 (default), fallback Pika/Runway (stub).
+
+TokenMeter (per plan) visible on all tool pages.
+
+CV Maker: guided form (name, contact, skills, experience, education), ATS toggle, Arabic/English selector; export DOCX/PDF.
+
+Slide Maker: form with topic, audience, #slides; export PPTX/PDF (use python-pptx).
+
+Image: editor (basic crop/resize, text overlay) + generator (prompt→grid).
+
+Video: upload short clip to edit (trim, captions) or generate short (≤15–20s) using model prompt; show queue state.
+
+Account: plan, usage meters, invoices, add-ons, cancel/renew.
+
+4) API Contracts (document in /docs/API_CONTRACTS.md + OpenAPI)
+
+Backend (FastAPI)
+
+POST /v1/auth/magic-link (email)
+
+POST /v1/auth/magic-link/verify
+
+GET /v1/plans
+
+POST /v1/payments/session (provider=hyperpay, plan_id) → {redirectUrl}
+
+POST /v1/payments/webhook/hyperpay
+
+GET /v1/usage/me
+
+POST /v1/cv/generate (form payload) → file id + download URL
+
+POST /v1/slides/generate (topic, points) → file id + download URL
+
+GET /v1/files/{file_id}/signed-url
+
+AI Gateway (FastAPI)
+
+POST /v1/chat/complete { model, messages[], system?, tools? }
+
+POST /v1/images/generate { model: 'nano-banana'|..., prompt, count }
+
+POST /v1/video/generate { model: 'veo3'|..., prompt, duration_s }
+
+All endpoints: plan enforcement, usage logging, rate limiting, moderation.
+
+5) Database Schema (Aurora PG, SQLAlchemy + Alembic)
+
+Tables:
+
+users(id, email, phone, locale, created_at, is_active)
+
+plans(id, name, price_jod, token_limit, image_limit, video_limit, features_json)
+
+subscriptions(id, user_id, plan_id, status, renews_at, provider, external_ref)
+
+payments(id, user_id, plan_id, amount_jod, provider, status, external_id, created_at, meta_json)
+
+usage_logs(id, user_id, kind['tokens'|'images'|'video'], amount, model, created_at, meta_json)
+
+files(id, user_id, kind['image'|'video'|'doc'], s3_key, bytes, created_at, meta_json)
+
+jobs(id, user_id, kind['video_gen'|'video_edit'], status, payload_json, result_file_id, created_at, updated_at)
+
+Indexes: (user_id, created_at), (kind, created_at), (model, created_at).
+
+Seed plans on first migration.
+
+6) AWS Terraform (infra/terraform)
+
+Goal: terraform apply from GitHub Actions OIDC with zero console.
+Include terraform.tfvars.example:
+
+aws_account_id = "000000000000"
+aws_region     = "eu-central-1"
+project_name   = "ai-studio"
+domain_name    = ""           # optional
+hosted_zone_id = ""           # optional
+
+Modules (implement all):
+
+vpc: 3 AZs; public & private subnets; NAT; SGs
+
+ecr: repos (frontend,backend,gateway,worker) with lifecycle policy
+
+ecs: cluster + Fargate services (fe public, be/gw/worker private), autoscaling; task roles; exec roles
+
+alb: ALB + TGs (fe/be/gw), L7 routing, 80→443 redirect (if cert)
+
+rds: Aurora PG Serverless v2 (min/max ACU), Secrets Manager creds
+
+redis: ElastiCache Redis (subnet group + SG)
+
+s3: ${project}-assets, ${project}-quarantine, ${project}-tfstate (state)
+
+cloudfront: distro for frontend origin (ALB) + S3 assets; ACM us-east-1 if domain
+
+acm: certs for ALB region + us-east-1 (CF)
+
+route53: if domain_name+hosted_zone_id → A/AAAA aliases, validation
+
+ses: verify domain/email identity; outputs SMTP creds; store in Secrets Manager
+
+iam: GitHub OIDC provider; roles:
+
+gha-infra-role (Terraform)
+
+gha-deploy-role (ECR push, ECS update)
+
+secrets: write placeholders:
+
+OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, REPLICATE_API_TOKEN
+
+NANO_BANANA_API_KEY, NANO_BANANA_BASE_URL
+
+VEO3_API_KEY, VEO3_BASE_URL
+
+JWT_SECRET, HYPERPAY_API_KEY, HYPERPAY_ENTITY_ID, HYPERPAY_TEST_MODE=true
+
+DATABASE_URL, REDIS_URL, S3_ASSETS_BUCKET, S3_QUAR_BUCKET
+
+SES_REGION, EMAIL_FROM
+
+observability: CloudWatch log groups; X-Ray; alarms (ALB 5xx, ECS unhealthy, RDS/Redis CPU)
+
+Remote state in S3 + DynamoDB lock (create via Terraform bootstrap logic; document in ACTIVITY.md).
+
+7) GitHub Actions (no long-lived keys)
+
+.github/workflows/infra.yml
+
+Trigger: pushes to infra/** + manual
+
+Steps: checkout → configure-aws-credentials(OIDC) → setup-terraform → init/plan/apply
+
+Append result to /docs/ACTIVITY.md and commit back (bot).
+
+.github/workflows/app.yml
+
+Trigger: pushes to apps/** or docker/** + manual
+
+Steps: checkout → configure-aws-credentials(OIDC) → ECR login → buildx build & push 4 images (tag = SHA) → update ECS task defs/services (script scripts/update_ecs_images.sh) → wait for stability → append to ACTIVITY.md (bot commit)
+
+Repository secrets/vars needed:
+
+AWS_ACCOUNT_ID (secret), AWS_REGION (var)
+
+Any domain vars if used
+
+Optionally CI-only e-mail for commits (bot)
+
+8) Services — Config & Secrets
+
+Use a small helper in Python to resolve aws:secretsmanager:KEY placeholders on boot (cache in memory).
+
+backend .env.example
+
+ENV=prod
+PORT=8080
+DATABASE_URL=aws:secretsmanager:AI_STUDIO_DATABASE_URL
+REDIS_URL=aws:secretsmanager:AI_STUDIO_REDIS_URL
+JWT_SECRET=aws:secretsmanager:AI_STUDIO_JWT_SECRET
+SES_REGION=aws:secretsmanager:AI_STUDIO_SES_REGION
+EMAIL_FROM=aws:secretsmanager:AI_STUDIO_EMAIL_FROM
+PAYMENTS_PROVIDER=hyperpay
+HYPERPAY_API_KEY=aws:secretsmanager:AI_STUDIO_HYPERPAY_API_KEY
+HYPERPAY_ENTITY_ID=aws:secretsmanager:AI_STUDIO_HYPERPAY_ENTITY_ID
+HYPERPAY_TEST_MODE=aws:secretsmanager:AI_STUDIO_HYPERPAY_TEST_MODE
+S3_ASSETS_BUCKET=aws:secretsmanager:AI_STUDIO_S3_ASSETS
+S3_QUAR_BUCKET=aws:secretsmanager:AI_STUDIO_S3_QUAR
+BASE_URL=https://app.your-domain.tld
+
+
+gateway .env.example
+
+ENV=prod
+PORT=8081
+REDIS_URL=aws:secretsmanager:AI_STUDIO_REDIS_URL
+OPENAI_API_KEY=aws:secretsmanager:OPENAI_API_KEY
+ANTHROPIC_API_KEY=aws:secretsmanager:ANTHROPIC_API_KEY
+GOOGLE_API_KEY=aws:secretsmanager:GOOGLE_API_KEY
+REPLICATE_API_TOKEN=aws:secretsmanager:REPLICATE_API_TOKEN
+NANO_BANANA_API_KEY=aws:secretsmanager:NANO_BANANA_API_KEY
+NANO_BANANA_BASE_URL=aws:secretsmanager:NANO_BANANA_BASE_URL
+VEO3_API_KEY=aws:secretsmanager:VEO3_API_KEY
+VEO3_BASE_URL=aws:secretsmanager:VEO3_BASE_URL
+PROVIDER_DEFAULT=openai
+TOKEN_LIMIT_WARN_PCT=0.8
+USAGE_DB_URL=aws:secretsmanager:AI_STUDIO_DATABASE_URL
+
+
+frontend .env.example
+
+NEXT_PUBLIC_API_BASE=https://api.your-domain.tld/v1
+NEXT_PUBLIC_GATEWAY_BASE=https://gateway.your-domain.tld/v1
+NEXT_PUBLIC_CDN_BASE=https://cdn.your-domain.tld
+
+9) AI Gateway (critical)
+
+Provider router chooses the integration based on model dropdown (payload model):
+
+Chat: openai:gpt-4o/gpt-5, anthropic:claude-4.5, google:gemini-1.5
+
+Images: nano-banana:* (default) else fallback
+
+Video: veo3:* (default) else fallback
+
+Usage metering: store token counts (chat) and item counts (images/videos) per user-per-month in Redis + DB (authoritative copy in DB).
+
+Rate limiting: sliding window (e.g., 60 req / 60s / user).
+
+Moderation: basic text/image moderation hook before provider call; block & log.
+
+Errors: provider timeouts → map to 504; validation → 400; plan exceeded → 402 with upgrade URL.
+
+10) Backend specifics
+
+Auth: magic link using SES (sandbox instructions in README).
+
+Payments: HyperPay test checkout → webhook → mark subscription active, set renews_at.
+
+CV Maker: convert structured form to DOCX/PDF (python-docx + weasyprint or docx-to-pdf container).
+
+Slides: python-pptx to build PPTX; also export PDF (headless libreoffice container or unoconv task in worker).
+
+Files: S3 uploads via backend; downloads via presigned URLs (time-bound).
+
+Usage: /v1/usage/me returns plan & limits + month’s consumption.
+
+11) Frontend specifics
+
+Pages:
+
+/ Hero (Arabic), pricing cards (3/5/7 JD), demo GIF, FAQs, CTA
+
+/app/chat with ModelSelector (chat models), message list, attachments, TokenMeter
+
+/app/cv with CvForm → preview → export
+
+/app/slides with SlidesForm → preview slides outline → export
+
+/app/image with ModelSelector (images), prompt input, grid, basic editor
+
+/app/video with ModelSelector (video), prompt or upload, queue status
+
+/app/account with plan, usage, invoices, add-ons, cancel/renew
+
+Arabic UX: RTL styles for Arabic; toggle to English.
+
+State: React Query; JWT stored as httpOnly cookie; CSRF protection.
+
+Errors: Friendly banners for quota exceeded, payment required.
+
+12) CI/CD & Scripts
+
+scripts/update_ecs_images.sh — reads cluster/service names from Terraform outputs; updates task defs with SHA tags.
+
+CI: lint/typecheck, unit tests, build images, push, roll services.
+
+Infra CI: plan/apply, attach outputs to job summary, append to ACTIVITY.md and commit.
+
+13) Docs
+
+ARCHITECTURE.md — diagrams + dataflow (FE→BE→GW→Providers; payments; files).
+
+RUNBOOK.md — how to rotate keys, restore DB, clear stuck jobs, throttle abusers.
+
+MARKETING_PLAYBOOK.md — 30 Arabic reel scripts, landing copy (AR/EN), referral copy.
+
+API_CONTRACTS.md — request/response JSON schemas; headers; error codes.
+
+CHECKLIST.md — build gates; must be ticked before release.
+
+ACTIVITY.md — continuous chronological log (every commit & CI run appends).
+
+14) CHECKLIST (initial content — keep updating)
+
+Infra
+
+ Remote state S3 + Dynamo created automatically
+
+ OIDC roles (gha-infra-role, gha-deploy-role) created by Terraform
+
+ VPC, ALB, ECS cluster/services (fe/be/gw/worker) healthy
+
+ Aurora PG up; DSN stored in Secrets Manager
+
+ ElastiCache Redis reachable from ECS tasks
+
+ S3 buckets assets/quarantine created
+
+ CloudFront active (or ALB default domain fallback)
+
+ SES identity verified; sandbox tested
+
+ Route53/ACM configured if domain provided
+
+App
+
+ Magic link login (SES) works end-to-end
+
+ Plans seeded (3/5/7 JD)
+
+ HyperPay test session→webhook→subscription active
+
+ Chat works; dropdown model selection; usage increments
+
+ Image page generates via Nano Banana; counts against image quota
+
+ Video page submits to Veo3 (or stub) and returns file; counts quota
+
+ CV Maker exports DOCX/PDF; Slide Maker exports PPTX/PDF
+
+ Account shows accurate monthly usage & invoices
+
+Gateway
+
+ Per-model routing works (openai/anthropic/google/nano-banana/veo3)
+
+ Quota 80% warn / 100% stop enforced
+
+ Sliding window rate limiting
+
+ Moderation hooks before providers
+
+CI/CD
+
+ infra.yml applies cleanly on main
+
+ app.yml builds, pushes, and rolls ECS zero-downtime
+
+ /docs/ACTIVITY.md auto-updated from CI
+
+15) Initial Execution Plan (do this now)
+
+Scaffold monorepo & baseline files.
+
+Implement Backend minimal: health, magic link (SES sandbox), plans seed, payments session/webhook, usage, files, CV/Slides generators.
+
+Implement Gateway minimal: /chat/complete, /images/generate (Nano Banana), /video/generate (Veo3); metering + rate limit + moderation.
+
+Implement Frontend pages and ModelSelector components for Chat/Image/Video.
+
+Write Terraform modules; default to ALB/CF managed domains if Route53 not provided.
+
+Create GitHub Actions (infra/app) with OIDC roles from Terraform; ensure bot appends to ACTIVITY.md.
+
+First main push → infra up. Second main push → images built & deployed.
+
+Record every step, errors, fixes, outputs, endpoints to /docs/ACTIVITY.md.
+
+Tick items in /docs/CHECKLIST.md as they pass.
+
+16) Provider Stubs (if SDKs private)
+
+Nano Banana: create providers/nano_banana_client.py with env NANO_BANANA_BASE_URL, NANO_BANANA_API_KEY; implement:
+
+generate_images(prompt: str, count: int) -> List[S3Key]
+
+If endpoint unknown, mock by calling Replicate/Stability underneath but keep the API name and wiring identical, so swapping is trivial.
+
+Veo3: providers/veo3_client.py with env VEO3_BASE_URL, VEO3_API_KEY; implement:
+
+generate_video(prompt: str, duration_s: int) -> JobId
+
+get_video(job_id) -> {status, s3_key}
+
+If endpoint unknown, mock with a queued worker job that stitches stock clips (FFmpeg) and returns quickly; keep interface compatible.
+
+Clearly document in ACTIVITY.md whether live or stub is used.
+
+17) Acceptance Tests
+
+Health checks 200 for BE & GW.
+
+SES magic link delivers (sandbox path documented).
+
+Payment test flow sets subscription active.
+
+Chat (GPT-4o) produces text; TokenMeter updates.
+
+Image (Nano Banana) returns images saved in S3; counts against plan.
+
+Video (Veo3) returns an asset (stub acceptable for MVP) and counts.
+
+CV/Slides export produce correct files downloadable via presigned URLs.
+
+CloudFront/ALB URL publicly serves frontend.
+
+Mark ✅ in CHECKLIST.md and include links/screenshots in ACTIVITY.md.
+
+End of rewritten instructions.
+If you want, I can also generate a starter pack of actual code files (Terraform module skeletons, Dockerfiles, minimal FastAPI endpoints, and the Next.js pages + ModelSelector) so Cursor has concrete anchors to extend.

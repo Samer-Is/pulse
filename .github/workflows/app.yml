@@ -1,0 +1,157 @@
+name: Application Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'docker/**'
+      - '.github/workflows/app.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-central-1.amazonaws.com
+  ECS_CLUSTER: ai-studio-prod-cluster
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Applications
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [frontend, backend, gateway, worker]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ai-studio-prod-gha-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Deploy-${{ matrix.service }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/${{ matrix.service }}.Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:latest
+          cache-to: type=inline
+
+      - name: Get current task definition
+        id: get-task-def
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ai-studio-prod-${{ matrix.service }} \
+            --query 'taskDefinition' \
+            --output json > task-def.json
+          
+          # Remove fields not needed for registration
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' task-def.json > task-def-clean.json
+
+      - name: Update task definition with new image
+        id: update-task-def
+        run: |
+          # Update image in task definition
+          jq --arg IMAGE "${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            task-def-clean.json > task-def-updated.json
+          
+          cat task-def-updated.json
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          NEW_TASK_DEF=$(aws ecs register-task-definition \
+            --cli-input-json file://task-def-updated.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          
+          echo "task_def_arn=$NEW_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "Registered new task definition: $NEW_TASK_DEF"
+
+      - name: Update ECS service
+        if: matrix.service != 'worker'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ai-studio-prod-${{ matrix.service }} \
+            --task-definition ${{ steps.register-task-def.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: Update ECS service (worker - no load balancer)
+        if: matrix.service == 'worker'
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ai-studio-prod-${{ matrix.service }} \
+            --task-definition ${{ steps.register-task-def.outputs.task_def_arn }} \
+            --force-new-deployment
+
+      - name: Wait for service stability
+        if: matrix.service != 'worker'
+        run: |
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ai-studio-prod-${{ matrix.service }}
+
+  update-activity:
+    name: Update Activity Log
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update ACTIVITY.md
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          echo "" >> docs/ACTIVITY.md
+          echo "### $TIMESTAMP - Application Deployed" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Action:** Docker images built and ECS services updated" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Commit:** ${{ github.sha }}" >> docs/ACTIVITY.md
+          echo "**Actor:** @${{ github.actor }}" >> docs/ACTIVITY.md
+          echo "**Workflow:** ${{ github.run_id }}" >> docs/ACTIVITY.md
+          echo "**Image Tag:** ${{ env.IMAGE_TAG }}" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Services Updated:**" >> docs/ACTIVITY.md
+          echo "- ✅ Frontend" >> docs/ACTIVITY.md
+          echo "- ✅ Backend" >> docs/ACTIVITY.md
+          echo "- ✅ Gateway" >> docs/ACTIVITY.md
+          echo "- ✅ Worker" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+
+      - name: Commit ACTIVITY.md
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "[bot] Update ACTIVITY.md - Application deployment"
+          file_pattern: docs/ACTIVITY.md
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+

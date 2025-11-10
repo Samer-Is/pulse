@@ -1,0 +1,123 @@
+name: Infrastructure Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: eu-central-1
+  TF_VERSION: 1.5.0
+
+jobs:
+  terraform:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ai-studio-prod-gha-infra-role
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-Infra
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -no-color
+        continue-on-error: true
+
+      - name: Comment PR (if PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Format: \`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization: \`${{ steps.init.outcome }}\`
+            #### Terraform Plan: \`${{ steps.plan.outcome }}\`
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            
+            </details>
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: output
+            })
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Output
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        id: output
+        run: |
+          terraform output -json > outputs.json
+          cat outputs.json
+
+      - name: Update ACTIVITY.md
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          cd ../..
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          echo "" >> docs/ACTIVITY.md
+          echo "### $TIMESTAMP - Infrastructure Deployed" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Action:** Terraform apply successful" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Commit:** ${{ github.sha }}" >> docs/ACTIVITY.md
+          echo "**Actor:** @${{ github.actor }}" >> docs/ACTIVITY.md
+          echo "**Workflow:** ${{ github.run_id }}" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+          echo "**Outputs:**" >> docs/ACTIVITY.md
+          echo "\`\`\`json" >> docs/ACTIVITY.md
+          cat infra/terraform/outputs.json >> docs/ACTIVITY.md
+          echo "\`\`\`" >> docs/ACTIVITY.md
+          echo "" >> docs/ACTIVITY.md
+
+      - name: Commit ACTIVITY.md
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "[bot] Update ACTIVITY.md - Infrastructure deployment"
+          file_pattern: docs/ACTIVITY.md
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
+
