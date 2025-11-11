@@ -61,13 +61,14 @@ module "secrets" {
 module "rds" {
   source = "./modules/rds"
   
-  project_name      = var.project_name
-  environment       = var.environment
-  vpc_id            = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  db_name           = var.db_name
-  min_capacity      = var.db_min_capacity
-  max_capacity      = var.db_max_capacity
+  project_name           = var.project_name
+  environment            = var.environment
+  vpc_id                 = module.vpc.vpc_id
+  private_subnet_ids     = module.vpc.private_subnet_ids
+  rds_security_group_id  = module.vpc.rds_security_group_id
+  db_name                = var.db_name
+  min_capacity           = var.db_min_capacity
+  max_capacity           = var.db_max_capacity
   
   depends_on = [module.vpc]
 }
@@ -76,10 +77,11 @@ module "rds" {
 module "redis" {
   source = "./modules/redis"
   
-  project_name       = var.project_name
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
+  project_name             = var.project_name
+  environment              = var.environment
+  vpc_id                   = module.vpc.vpc_id
+  private_subnet_ids       = module.vpc.private_subnet_ids
+  redis_security_group_id  = module.vpc.redis_security_group_id
   
   depends_on = [module.vpc]
 }
@@ -88,11 +90,12 @@ module "redis" {
 module "alb" {
   source = "./modules/alb"
   
-  project_name       = var.project_name
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  certificate_arn    = var.domain_name != "" ? module.acm[0].certificate_arn : ""
+  project_name            = var.project_name
+  environment             = var.environment
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  alb_security_group_id   = module.vpc.alb_security_group_id
+  certificate_arn         = var.domain_name != "" ? module.acm[0].certificate_arn : ""
   
   depends_on = [module.vpc]
 }
