@@ -2,7 +2,7 @@ name: Application Deployment
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     paths:
       - 'apps/**'
       - 'docker/**'
@@ -14,9 +14,9 @@ permissions:
   contents: write
 
 env:
-  AWS_REGION: eu-central-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-central-1.amazonaws.com
-  ECS_CLUSTER: ai-studio-prod-cluster
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 669633199086.dkr.ecr.us-east-1.amazonaws.com
+  ECS_CLUSTER: pulse-ai-studio-prod-cluster
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ai-studio-prod-gha-deploy-role
+          role-to-assume: arn:aws:iam::669633199086:role/pulse-ai-studio-prod-gha-deploy-role
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GitHubActions-Deploy-${{ matrix.service }}
 
@@ -49,20 +49,20 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: docker/${{ matrix.service }}.Dockerfile
+          context: ./apps/${{ matrix.service }}
+          file: ./apps/${{ matrix.service }}/Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:latest
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:latest
+            ${{ env.ECR_REGISTRY }}/pulse-ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/pulse-ai-studio-prod-${{ matrix.service }}:latest
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/pulse-ai-studio-prod-${{ matrix.service }}:latest
           cache-to: type=inline
 
       - name: Get current task definition
         id: get-task-def
         run: |
           aws ecs describe-task-definition \
-            --task-definition ai-studio-prod-${{ matrix.service }} \
+            --task-definition pulse-ai-studio-prod-${{ matrix.service }} \
             --query 'taskDefinition' \
             --output json > task-def.json
           
@@ -73,7 +73,7 @@ jobs:
         id: update-task-def
         run: |
           # Update image in task definition
-          jq --arg IMAGE "${{ env.ECR_REGISTRY }}/ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}" \
+          jq --arg IMAGE "${{ env.ECR_REGISTRY }}/pulse-ai-studio-prod-${{ matrix.service }}:${{ env.IMAGE_TAG }}" \
             '.containerDefinitions[0].image = $IMAGE' \
             task-def-clean.json > task-def-updated.json
           
@@ -95,7 +95,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --service ai-studio-prod-${{ matrix.service }} \
+            --service pulse-ai-studio-prod-${{ matrix.service }} \
             --task-definition ${{ steps.register-task-def.outputs.task_def_arn }} \
             --force-new-deployment
 
@@ -104,7 +104,7 @@ jobs:
         run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --service ai-studio-prod-${{ matrix.service }} \
+            --service pulse-ai-studio-prod-${{ matrix.service }} \
             --task-definition ${{ steps.register-task-def.outputs.task_def_arn }} \
             --force-new-deployment
 
@@ -114,7 +114,7 @@ jobs:
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
             --cluster ${{ env.ECS_CLUSTER }} \
-            --services ai-studio-prod-${{ matrix.service }}
+            --services pulse-ai-studio-prod-${{ matrix.service }}
 
   update-activity:
     name: Update Activity Log
