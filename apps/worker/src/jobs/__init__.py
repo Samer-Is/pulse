@@ -1,2 +1,1 @@
-"""Background jobs."""
-
+"""Worker jobs package."""
