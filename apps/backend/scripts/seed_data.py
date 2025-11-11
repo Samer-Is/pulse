@@ -27,13 +27,13 @@ def seed_plans():
             {
                 "name": "Starter",
                 "price_jod": Decimal("3.00"),
-                "token_limit": 100000,
-                "image_limit": 20,
-                "video_limit": 3,
+                "token_limit": 150000,
+                "image_limit": 10,
+                "video_limit": 2,
                 "features_json": {
                     "chat": True,
                     "cv_maker": True,
-                    "slides_maker": True,
+                    "slides_maker": False,
                     "image_editor": True,
                     "video_editor": False,
                     "priority_support": False
@@ -42,9 +42,9 @@ def seed_plans():
             {
                 "name": "Pro",
                 "price_jod": Decimal("5.00"),
-                "token_limit": 500000,
-                "image_limit": 50,
-                "video_limit": 10,
+                "token_limit": 400000,
+                "image_limit": 30,
+                "video_limit": 5,
                 "features_json": {
                     "chat": True,
                     "cv_maker": True,
@@ -57,9 +57,9 @@ def seed_plans():
             {
                 "name": "Creator",
                 "price_jod": Decimal("7.00"),
-                "token_limit": 2000000,
-                "image_limit": 100,
-                "video_limit": 30,
+                "token_limit": 1000000,
+                "image_limit": 60,
+                "video_limit": 10,
                 "features_json": {
                     "chat": True,
                     "cv_maker": True,
