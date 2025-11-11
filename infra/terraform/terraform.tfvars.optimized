@@ -11,7 +11,8 @@ domain_name     = "pulse.yourdomain.com"        # ← YOUR DOMAIN
 ses_from_email  = "noreply@pulse.yourdomain.com" # ← YOUR EMAIL
 
 # GitHub repo for OIDC
-github_repo = "Samer-Is/pulse"
+github_org  = "Samer-Is"
+github_repo = "pulse"
 
 # === COST OPTIMIZATIONS ===
 
