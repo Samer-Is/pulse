@@ -13,7 +13,7 @@ COPY pyproject.toml ./
 # Install Python dependencies
 RUN pip install --no-cache-dir poetry && \
     poetry config virtualenvs.create false && \
-    poetry install --no-dev --no-interaction --no-ansi
+    poetry install --only main --no-interaction --no-ansi --no-root
 
 # Copy application code
 COPY . .
@@ -23,4 +23,3 @@ EXPOSE 8081
 
 # Run the application
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8081"]
-
