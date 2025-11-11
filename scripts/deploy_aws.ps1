@@ -164,3 +164,4 @@ Write-Host ""
 Write-Host "To destroy infrastructure: terraform destroy" -ForegroundColor Yellow
 Write-Host ""
 
+

@@ -87,3 +87,4 @@ Write-Host "2. Run: aws configure" -ForegroundColor White
 Write-Host "3. Run: .\scripts\deploy_aws.ps1" -ForegroundColor White
 Write-Host ""
 
+

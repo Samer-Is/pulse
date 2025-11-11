@@ -131,7 +131,7 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu_high" {
 
 # X-Ray Sampling Rule
 resource "aws_xray_sampling_rule" "main" {
-  rule_name      = "${local.name_prefix}-sampling-rule"
+  rule_name      = "${var.project_name}-${var.environment}-xray"
   priority       = 1000
   version        = 1
   reservoir_size = 1

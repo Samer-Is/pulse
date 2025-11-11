@@ -1,5 +1,5 @@
 # Main Terraform configuration
-# Orchestrates all modules
+# Orchestrates all modules with proper dependency order
 
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
@@ -10,7 +10,11 @@ locals {
   }
 }
 
-# VPC Module
+# ==============================================================================
+# PHASE 1: Foundation (No dependencies)
+# ==============================================================================
+
+# VPC Module (creates VPC, subnets, NAT, security groups)
 module "vpc" {
   source = "./modules/vpc"
   
@@ -20,17 +24,15 @@ module "vpc" {
   availability_zones = var.availability_zones
 }
 
-# ECR Module
-module "ecr" {
-  source = "./modules/ecr"
+# S3 Module (creates buckets)
+module "s3" {
+  source = "./modules/s3"
   
   project_name = var.project_name
   environment  = var.environment
-  
-  repositories = ["frontend", "backend", "gateway", "worker"]
 }
 
-# IAM Module (OIDC for GitHub Actions)
+# IAM Module (creates roles for GitHub OIDC and ECS)
 module "iam" {
   source = "./modules/iam"
   
@@ -41,23 +43,35 @@ module "iam" {
   aws_region   = var.aws_region
 }
 
-# S3 Module
-module "s3" {
-  source = "./modules/s3"
+# ECR Module (creates container registries)
+module "ecr" {
+  source = "./modules/ecr"
   
   project_name = var.project_name
   environment  = var.environment
+  
+  repositories = ["frontend", "backend", "gateway", "worker"]
 }
 
-# Secrets Manager Module
+# ==============================================================================
+# PHASE 2: Dependent Infrastructure
+# ==============================================================================
+
+# Secrets Manager Module (needs S3 bucket names)
 module "secrets" {
   source = "./modules/secrets"
   
-  project_name = var.project_name
-  environment  = var.environment
+  project_name           = var.project_name
+  environment            = var.environment
+  aws_region             = var.aws_region
+  assets_bucket_name     = module.s3.assets_bucket_name
+  quarantine_bucket_name = module.s3.quarantine_bucket_name
+  
+  depends_on = [module.s3]
 }
 
-# RDS Module
+# RDS Module (needs VPC and security groups)
+# Using Free Tier PostgreSQL (db.t3.micro)
 module "rds" {
   source = "./modules/rds"
   
@@ -67,13 +81,11 @@ module "rds" {
   private_subnet_ids     = module.vpc.private_subnet_ids
   rds_security_group_id  = module.vpc.rds_security_group_id
   db_name                = var.db_name
-  min_capacity           = var.db_min_capacity
-  max_capacity           = var.db_max_capacity
   
   depends_on = [module.vpc]
 }
 
-# Redis Module
+# Redis Module (needs VPC and security groups)
 module "redis" {
   source = "./modules/redis"
   
@@ -86,7 +98,7 @@ module "redis" {
   depends_on = [module.vpc]
 }
 
-# ALB Module
+# ALB Module (needs VPC and security groups)
 module "alb" {
   source = "./modules/alb"
   
@@ -95,40 +107,12 @@ module "alb" {
   vpc_id                  = module.vpc.vpc_id
   public_subnet_ids       = module.vpc.public_subnet_ids
   alb_security_group_id   = module.vpc.alb_security_group_id
-  certificate_arn         = var.domain_name != "" ? module.acm[0].certificate_arn : ""
+  certificate_arn         = ""  # No certificate for now
   
   depends_on = [module.vpc]
 }
 
-# ECS Module
-module "ecs" {
-  source = "./modules/ecs"
-  
-  project_name       = var.project_name
-  environment        = var.environment
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  public_subnet_ids  = module.vpc.public_subnet_ids
-  
-  alb_target_group_frontend_arn = module.alb.target_group_frontend_arn
-  alb_target_group_backend_arn  = module.alb.target_group_backend_arn
-  alb_target_group_gateway_arn  = module.alb.target_group_gateway_arn
-  
-  ecr_repositories = module.ecr.repository_urls
-  
-  frontend_cpu    = var.ecs_frontend_cpu
-  frontend_memory = var.ecs_frontend_memory
-  backend_cpu     = var.ecs_backend_cpu
-  backend_memory  = var.ecs_backend_memory
-  gateway_cpu     = var.ecs_gateway_cpu
-  gateway_memory  = var.ecs_gateway_memory
-  worker_cpu      = var.ecs_worker_cpu
-  worker_memory   = var.ecs_worker_memory
-  
-  depends_on = [module.vpc, module.alb, module.ecr]
-}
-
-# SES Module
+# SES Module (for sending emails)
 module "ses" {
   source = "./modules/ses"
   
@@ -137,47 +121,10 @@ module "ses" {
   domain_name  = var.domain_name
 }
 
-# ACM Module (optional, if domain provided)
-module "acm" {
-  count  = var.domain_name != "" ? 1 : 0
-  source = "./modules/acm"
-  
-  project_name    = var.project_name
-  environment     = var.environment
-  domain_name     = var.domain_name
-  hosted_zone_id  = var.hosted_zone_id
-}
+# ==============================================================================
+# PHASE 3: Observability (creates log groups for ECS)
+# ==============================================================================
 
-# CloudFront Module (optional)
-module "cloudfront" {
-  count  = var.domain_name != "" ? 1 : 0
-  source = "./modules/cloudfront"
-  
-  project_name    = var.project_name
-  environment     = var.environment
-  alb_domain_name = module.alb.alb_dns_name
-  certificate_arn = module.acm[0].certificate_arn_us_east_1
-  domain_name     = var.domain_name
-  
-  depends_on = [module.alb, module.acm]
-}
-
-# Route53 Module (optional)
-module "route53" {
-  count  = var.domain_name != "" ? 1 : 0
-  source = "./modules/route53"
-  
-  project_name        = var.project_name
-  environment         = var.environment
-  domain_name         = var.domain_name
-  hosted_zone_id      = var.hosted_zone_id
-  cloudfront_domain   = module.cloudfront[0].cloudfront_domain_name
-  cloudfront_zone_id  = module.cloudfront[0].cloudfront_hosted_zone_id
-  
-  depends_on = [module.cloudfront]
-}
-
-# Observability Module
 module "observability" {
   source = "./modules/observability"
   
@@ -185,9 +132,99 @@ module "observability" {
   environment  = var.environment
   
   alb_arn            = module.alb.alb_arn
-  ecs_cluster_name   = module.ecs.cluster_name
+  ecs_cluster_name   = "${var.project_name}-${var.environment}"  # Will be created by ECS module
   rds_cluster_id     = module.rds.cluster_id
   redis_cluster_id   = module.redis.cluster_id
   
-  depends_on = [module.ecs, module.rds, module.redis]
+  depends_on = [module.alb, module.rds, module.redis]
 }
+
+# ==============================================================================
+# PHASE 4: ECS (needs everything else)
+# ==============================================================================
+
+module "ecs" {
+  source = "./modules/ecs"
+  
+  # Basic config
+  project_name    = var.project_name
+  environment     = var.environment
+  aws_region      = var.aws_region
+  aws_account_id  = var.aws_account_id
+  
+  # Network
+  vpc_id                  = module.vpc.vpc_id
+  private_subnet_ids      = module.vpc.private_subnet_ids
+  ecs_security_group_id   = module.vpc.ecs_tasks_security_group_id
+  
+  # IAM (matching exact variable names from ECS module)
+  execution_role_arn = module.iam.ecs_task_execution_role_arn
+  task_role_arn      = module.iam.ecs_task_role_arn
+  
+  # ALB (matching exact variable names)
+  frontend_target_group_arn = module.alb.target_group_frontend_arn
+  backend_target_group_arn  = module.alb.target_group_backend_arn
+  gateway_target_group_arn  = module.alb.target_group_gateway_arn
+  alb_listener_arn          = module.alb.http_listener_arn
+  
+  # CloudWatch Log Groups (matching exact variable names)
+  log_group_frontend = module.observability.log_group_frontend
+  log_group_backend  = module.observability.log_group_backend
+  log_group_gateway  = module.observability.log_group_gateway
+  log_group_worker   = module.observability.log_group_worker
+  
+  # ECR Repositories (as a map - matching exact variable name)
+  ecr_repository_urls = module.ecr.repository_urls
+  
+  depends_on = [
+    module.vpc,
+    module.iam,
+    module.alb,
+    module.observability,
+    module.ecr
+  ]
+}
+
+# ==============================================================================
+# OPTIONAL MODULES (Disabled for core infrastructure deployment)
+# ==============================================================================
+
+# ACM Module - DISABLED
+# module "acm" {
+#   count  = var.domain_name != "" ? 1 : 0
+#   source = "./modules/acm"
+#   
+#   project_name    = var.project_name
+#   environment     = var.environment
+#   domain_name     = var.domain_name
+#   hosted_zone_id  = var.hosted_zone_id
+# }
+
+# CloudFront Module - DISABLED
+# module "cloudfront" {
+#   count  = var.domain_name != "" ? 1 : 0
+#   source = "./modules/cloudfront"
+#   
+#   project_name    = var.project_name
+#   environment     = var.environment
+#   alb_domain_name = module.alb.alb_dns_name
+#   certificate_arn = module.acm[0].certificate_arn_us_east_1
+#   domain_name     = var.domain_name
+#   
+#   depends_on = [module.alb, module.acm]
+# }
+
+# Route53 Module - DISABLED
+# module "route53" {
+#   count  = var.domain_name != "" ? 1 : 0
+#   source = "./modules/route53"
+#   
+#   project_name        = var.project_name
+#   environment         = var.environment
+#   domain_name         = var.domain_name
+#   hosted_zone_id      = var.hosted_zone_id
+#   cloudfront_domain   = module.cloudfront[0].cloudfront_domain_name
+#   cloudfront_zone_id  = module.cloudfront[0].cloudfront_hosted_zone_id
+#   
+#   depends_on = [module.cloudfront]
+# }

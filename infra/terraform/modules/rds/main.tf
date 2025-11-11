@@ -1,4 +1,4 @@
-# RDS Module - Aurora PostgreSQL Serverless v2
+# RDS Module - Free Tier PostgreSQL
 
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
@@ -15,57 +15,55 @@ resource "aws_db_subnet_group" "main" {
 }
 
 # Random password for master user
+# RDS doesn't allow: / @ " ' space
 resource "random_password" "master" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
-# Aurora Cluster
-resource "aws_rds_cluster" "main" {
-  cluster_identifier      = "${local.name_prefix}-aurora-cluster"
-  engine                  = "aurora-postgresql"
-  engine_mode             = "provisioned"
-  engine_version          = "15.4"
-  database_name           = var.db_name
-  master_username         = "pulseadmin"
-  master_password         = random_password.master.result
-  db_subnet_group_name    = aws_db_subnet_group.main.name
-  vpc_security_group_ids  = [var.rds_security_group_id]
-  backup_retention_period = 7
-  preferred_backup_window = "03:00-04:00"
-  skip_final_snapshot     = var.environment != "prod"
-  final_snapshot_identifier = var.environment == "prod" ? "${local.name_prefix}-final-snapshot" : null
+# RDS PostgreSQL Instance (Free Tier Eligible)
+resource "aws_db_instance" "main" {
+  identifier     = "${local.name_prefix}-postgres"
+  engine         = "postgres"
+  engine_version = "15"
   
-  serverlessv2_scaling_configuration {
-    min_capacity = var.min_capacity
-    max_capacity = var.max_capacity
-  }
-
-  enabled_cloudwatch_logs_exports = ["postgresql"]
-
+  # Free Tier eligible configuration
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+  storage_type      = "gp2"
+  
+  db_name  = var.db_name
+  username = "pulseadmin"
+  password = random_password.master.result
+  
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [var.rds_security_group_id]
+  
+  publicly_accessible = false
+  skip_final_snapshot = true  # For dev/test environments
+  
+  backup_retention_period = 7
+  backup_window           = "03:00-04:00"
+  maintenance_window      = "mon:04:00-mon:05:00"
+  
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+  
+  # Performance Insights (optional, adds minimal cost)
+  performance_insights_enabled = false
+  
+  # Auto minor version upgrade
+  auto_minor_version_upgrade = true
+  
   tags = {
-    Name = "${local.name_prefix}-aurora-cluster"
-  }
-}
-
-# Aurora Instance (Serverless v2)
-resource "aws_rds_cluster_instance" "main" {
-  identifier         = "${local.name_prefix}-aurora-instance-1"
-  cluster_identifier = aws_rds_cluster.main.id
-  instance_class     = "db.serverless"
-  engine             = aws_rds_cluster.main.engine
-  engine_version     = aws_rds_cluster.main.engine_version
-
-  tags = {
-    Name = "${local.name_prefix}-aurora-instance-1"
+    Name = "${local.name_prefix}-postgres"
   }
 }
 
 # Store database URL in Secrets Manager
 resource "aws_secretsmanager_secret_version" "database_url" {
   secret_id = "AI_STUDIO_DATABASE_URL"
-  secret_string = "postgresql://${aws_rds_cluster.main.master_username}:${random_password.master.result}@${aws_rds_cluster.main.endpoint}:5432/${aws_rds_cluster.main.database_name}"
+  secret_string = "postgresql://${aws_db_instance.main.username}:${random_password.master.result}@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
 
-  depends_on = [aws_rds_cluster.main]
+  depends_on = [aws_db_instance.main]
 }
-

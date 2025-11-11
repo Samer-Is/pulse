@@ -93,3 +93,4 @@ tags = {
 # - Use 3 Redis nodes for HA (+$25/mo)
 # - Increase ECS task counts for scale (+$20-40/mo)
 
+

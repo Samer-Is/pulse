@@ -29,15 +29,4 @@ variable "db_name" {
   default     = "pulse_ai"
 }
 
-variable "min_capacity" {
-  description = "Minimum Aurora Serverless v2 capacity (ACUs)"
-  type        = number
-  default     = 0.5
-}
-
-variable "max_capacity" {
-  description = "Maximum Aurora Serverless v2 capacity (ACUs)"
-  type        = number
-  default     = 4
-}
-
+# Aurora capacity variables removed - using Free Tier RDS instance (db.t3.micro)

@@ -190,3 +190,4 @@ This will take additional time but gives you the full setup.
 - A) Deploy core infrastructure NOW (simpler, 20 min, $60-100/mo)
 - B) Fix everything first, then deploy (complete, 30 min, $80-120/mo)
 
+

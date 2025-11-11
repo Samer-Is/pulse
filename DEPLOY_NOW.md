@@ -210,3 +210,4 @@ terraform apply  # Type "yes"
 
 **Then wait 25-30 minutes and your infrastructure is live!**
 
+

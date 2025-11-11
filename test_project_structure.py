@@ -295,3 +295,4 @@ print("  [FAIL] Anthropic: API key may not have model access")
 print("  [FAIL] Gemini: Quota exceeded (free tier limit)")
 print()
 
+

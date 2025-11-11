@@ -47,10 +47,11 @@ output "s3_tfstate_bucket" {
   value       = module.s3.tfstate_bucket_name
 }
 
-output "cloudfront_domain" {
-  description = "CloudFront domain name"
-  value       = var.domain_name != "" ? module.cloudfront[0].cloudfront_domain_name : "N/A (domain not configured)"
-}
+# CloudFront disabled for core infrastructure deployment
+# output "cloudfront_domain" {
+#   description = "CloudFront domain name"
+#   value       = var.domain_name != "" ? module.cloudfront[0].cloudfront_domain_name : "N/A (domain not configured)"
+# }
 
 output "github_oidc_role_arn_infra" {
   description = "GitHub Actions OIDC role ARN for infrastructure"
