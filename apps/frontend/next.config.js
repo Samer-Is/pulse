@@ -2,29 +2,21 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  
-  // i18n (Arabic/English)
-  i18n: {
-    locales: ['ar', 'en'],
-    defaultLocale: 'ar',
-    localeDetection: true,
-  },
+  output: 'standalone',
   
   // Image optimization
   images: {
     domains: [
-      's3.eu-central-1.amazonaws.com',
-      'ai-studio-assets.s3.amazonaws.com',
-      // Add CloudFront domain when available
+      's3.us-east-1.amazonaws.com',
+      'pulse-ai-studio-prod-assets.s3.amazonaws.com',
     ],
     formats: ['image/webp', 'image/avif'],
   },
   
   // Environment variables exposed to browser
   env: {
-    NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE,
-    NEXT_PUBLIC_GATEWAY_BASE: process.env.NEXT_PUBLIC_GATEWAY_BASE,
-    NEXT_PUBLIC_CDN_BASE: process.env.NEXT_PUBLIC_CDN_BASE,
+    NEXT_PUBLIC_API_BASE: process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080',
+    NEXT_PUBLIC_GATEWAY_BASE: process.env.NEXT_PUBLIC_GATEWAY_BASE || 'http://localhost:8081',
   },
   
   // Headers for security
