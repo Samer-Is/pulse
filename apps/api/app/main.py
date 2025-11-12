@@ -12,7 +12,16 @@ from fastapi.responses import JSONResponse
 from .database import init_db, close_db
 from .routers import api_router
 from .middleware.rate_limit import RateLimitMiddleware
-from .middleware.security import SecurityHeadersMiddleware
+from .middleware.security import SecurityHeadersMiddleware, RequestValidationMiddleware
+from .middleware.errors import (
+    http_exception_handler,
+    validation_exception_handler,
+    quota_exception_handler,
+    general_exception_handler,
+)
+from .utils.quota import QuotaError
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 @asynccontextmanager
@@ -42,8 +51,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Exception handlers
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(QuotaError, quota_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 # Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Request Validation Middleware
+app.add_middleware(RequestValidationMiddleware)
 
 # Rate Limiting Middleware
 app.add_middleware(
