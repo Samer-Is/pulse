@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  api:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/pulse-api:${IMAGE_TAG:-latest}
+    container_name: pulse-api
+    environment:
+      # Environment
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      
+      # Database
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}
+      POSTGRES_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}
+      
+      # AWS
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      
+      # Security
+      ALLOWED_ORIGINS: https://${DOMAIN},https://www.${DOMAIN}
+      ALLOWED_HOSTS: ${DOMAIN},www.${DOMAIN}
+      
+      # Skip secrets manager in favor of environment variables
+      SKIP_SECRETS_MANAGER: "false"
+      
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Next.js Frontend
+  web:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/pulse-web:${IMAGE_TAG:-latest}
+    container_name: pulse-web
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE: https://${DOMAIN}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Node.js Workers
+  workers:
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/pulse-workers:${IMAGE_TAG:-latest}
+    container_name: pulse-workers
+    environment:
+      NODE_ENV: production
+      AWS_REGION: ${AWS_REGION}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}
+      POSTGRES_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/${DB_NAME}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Nginx Reverse Proxy (Optional - if not using ALB)
+  nginx:
+    image: nginx:alpine
+    container_name: pulse-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: pulse-network
+
