@@ -22,8 +22,8 @@ class UsageEvent(Base, TimestampMixin):
     event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     
-    # Metadata
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON)
+    # Additional data
+    event_metadata: Mapped[Optional[dict]] = mapped_column(JSON)
     
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="usage_events")

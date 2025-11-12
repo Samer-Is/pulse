@@ -45,12 +45,17 @@ services:
       - "8000:8000"
     environment:
       NODE_ENV: development
+      DATABASE_URL: postgresql://pulse:pulse@postgres:5432/pulse
       POSTGRES_URL: postgresql://pulse:pulse@postgres:5432/pulse
       AWS_REGION: eu-central-1
       S3_BUCKET_NAME: pulse-dev-exports
       SQS_QUEUE_URL: http://localstack:4566/000000000000/pulse-jobs
       AWS_ENDPOINT_URL: http://localstack:4566
       JWT_SECRET: dev-secret-change-in-production
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/callback/google}
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost
     depends_on:
       postgres:
         condition: service_healthy
