@@ -9,6 +9,7 @@ from .chat import router as chat_router
 from .images import router as images_router
 from .videos import router as videos_router
 from .cv import router as cv_router
+from .slides import router as slides_router
 from .health import router as health_router
 
 # Create main API router
@@ -23,6 +24,7 @@ api_router.include_router(chat_router, prefix="/chat", tags=["chat"])
 api_router.include_router(images_router, prefix="/images", tags=["images"])
 api_router.include_router(videos_router, prefix="/videos", tags=["videos"])
 api_router.include_router(cv_router, prefix="/cv", tags=["cv"])
+api_router.include_router(slides_router, prefix="/slides", tags=["slides"])
 
 __all__ = ["api_router"]
 

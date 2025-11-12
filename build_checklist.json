@@ -1,31 +1,37 @@
 {
-  "phase": 5,
-  "phase_name": "Video Generation (Runway/Pika) + Jobs (SQS)",
+  "phase": 7,
+  "phase_name": "Slide Maker (Export PPTX/PDF)",
   "status": "completed",
   "items": [
     {
-      "id": "sqs_integration",
-      "title": "SQS queue utilities and integration",
+      "id": "slide_schemas",
+      "title": "Slide data models and schemas",
       "status": "done",
-      "details": "SQSManager with send/receive/delete, long polling, enqueue_video_job method"
+      "details": "SlideContent, SlideGenerationRequest/Response, OutlineGeneration schemas"
     },
     {
-      "id": "video_api",
-      "title": "Video generation API endpoints",
+      "id": "slide_generator",
+      "title": "PPTX and PDF generation service",
       "status": "done",
-      "details": "POST /generate, GET /status, GET /stream (SSE), quota checking, job enqueuing"
+      "details": "python-pptx for PPTX, Playwright for PDF, professional templates, speaker notes"
     },
     {
-      "id": "worker_service",
-      "title": "Node.js worker service",
+      "id": "ai_outline",
+      "title": "AI-powered outline generation",
       "status": "done",
-      "details": "SQS polling, video processor, database operations, mock provider, S3 upload"
+      "details": "Uses OpenAI/Anthropic, JSON parsing, topic/audience/style parameters"
     },
     {
-      "id": "video_frontend",
-      "title": "Video generation UI with progress tracking",
+      "id": "slide_api",
+      "title": "Slide generation API endpoints",
       "status": "done",
-      "details": "SSE streaming, progress bar, status icons, video playback, download, settings"
+      "details": "POST /generate-outline, POST /generate, auto and manual modes, S3 upload"
+    },
+    {
+      "id": "slide_frontend",
+      "title": "Slide builder UI with dual modes",
+      "status": "done",
+      "details": "AI generate mode, manual entry mode, dynamic slides, preview, responsive design"
     }
   ],
   "completed_phases": [
@@ -69,13 +75,27 @@
       "status": "completed",
       "completed_at": "2025-11-12",
       "notes": "SQS queue, async worker service, SSE streaming, mock video provider, frontend with progress"
+    },
+    {
+      "phase": 6,
+      "name": "CV Maker (Export DOCX/PDF)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "python-docx for DOCX, Playwright for PDF, comprehensive CV form, S3 storage, 7-day URLs"
+    },
+    {
+      "phase": 7,
+      "name": "Slide Maker (Export PPTX/PDF)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "python-pptx for PPTX, Playwright for PDF, AI-powered outline generation, dual-mode UI"
     }
   ],
-  "last_updated": "2025-11-12T18:00:00Z",
-  "notes": "✅ Phase 5 COMPLETE - Async video generation with SQS queue system fully functional! Worker service processes jobs asynchronously.",
+  "last_updated": "2025-11-12T20:00:00Z",
+  "notes": "✅ Phase 7 COMPLETE - Slide maker with AI-powered outline generation and PPTX/PDF export fully functional!",
   "next_phase": {
-    "phase": 6,
-    "name": "CV Maker (Export DOCX/PDF)",
+    "phase": 8,
+    "name": "Plans, Quotas, Admin Dashboard, Payments (Stripe)",
     "status": "ready"
   }
 }

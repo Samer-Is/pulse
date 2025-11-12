@@ -33,12 +33,12 @@ export default function Home() {
               Create professional CVs and export as DOCX/PDF
             </p>
           </Link>
-          <div className="p-6 border rounded-lg">
+          <Link href="/slides" className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition">
             <h2 className="text-xl font-semibold mb-2">Slide Maker</h2>
             <p className="text-sm text-muted-foreground">
               Generate presentation slides and export as PPTX/PDF
             </p>
-          </div>
+          </Link>
           <div className="p-6 border rounded-lg">
             <h2 className="text-xl font-semibold mb-2">Admin</h2>
             <p className="text-sm text-muted-foreground">
