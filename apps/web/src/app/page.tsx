@@ -21,12 +21,12 @@ export default function Home() {
               Text-to-image generation via Google Vertex AI Imagen
             </p>
           </Link>
-          <div className="p-6 border rounded-lg">
+          <Link href="/videos" className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition">
             <h2 className="text-xl font-semibold mb-2">Videos</h2>
             <p className="text-sm text-muted-foreground">
               Async video generation with Runway and Pika
             </p>
-          </div>
+          </Link>
           <div className="p-6 border rounded-lg">
             <h2 className="text-xl font-semibold mb-2">CV Maker</h2>
             <p className="text-sm text-muted-foreground">

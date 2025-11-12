@@ -1,22 +1,42 @@
 /**
  * Pulse AI Studio - Worker Service
- * Handles async jobs (video generation, long-running exports)
+ * Processes async jobs from SQS queue (video generation, etc.)
  */
-import { config } from 'dotenv';
 
+import { config } from 'dotenv';
+import { SQSWorker } from './services/sqs-worker';
+import { VideoProcessor } from './processors/video-processor';
+import { DatabaseService } from './services/database';
+
+// Load environment variables
 config();
 
-console.log('Pulse AI Studio Worker starting...');
-console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log('🚀 Pulse Worker Service starting...');
 
-// Worker will poll SQS queue for jobs
-async function startWorker() {
-  console.log('Worker initialized - ready to process jobs');
-  // TODO: Implement SQS polling in Phase 5
-}
+// Initialize services
+const database = new DatabaseService();
+const videoProcessor = new VideoProcessor(database);
+const sqsWorker = new SQSWorker(videoProcessor);
 
-startWorker().catch((error) => {
-  console.error('Worker failed to start:', error);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('📛 SIGTERM received, shutting down gracefully...');
+  sqsWorker.stop();
+  await database.close();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('📛 SIGINT received, shutting down gracefully...');
+  sqsWorker.stop();
+  await database.close();
+  process.exit(0);
+});
+
+// Start worker
+sqsWorker.start().catch((error) => {
+  console.error('❌ Fatal error:', error);
   process.exit(1);
 });
 
+console.log('✅ Worker service started successfully');
