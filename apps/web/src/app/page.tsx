@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
@@ -7,12 +9,12 @@ export default function Home() {
           Multi-feature AI platform with Chat, Images, Videos, CV Maker, and Slide Maker
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="p-6 border rounded-lg">
+          <Link href="/chat" className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition">
             <h2 className="text-xl font-semibold mb-2">Chat</h2>
             <p className="text-sm text-muted-foreground">
               Multi-provider LLM chat with OpenAI, Anthropic, and Google Gemini
             </p>
-          </div>
+          </Link>
           <div className="p-6 border rounded-lg">
             <h2 className="text-xl font-semibold mb-2">Images</h2>
             <p className="text-sm text-muted-foreground">
