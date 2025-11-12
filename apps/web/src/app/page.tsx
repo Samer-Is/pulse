@@ -15,12 +15,12 @@ export default function Home() {
               Multi-provider LLM chat with OpenAI, Anthropic, and Google Gemini
             </p>
           </Link>
-          <div className="p-6 border rounded-lg">
+          <Link href="/images" className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition">
             <h2 className="text-xl font-semibold mb-2">Images</h2>
             <p className="text-sm text-muted-foreground">
               Text-to-image generation via Google Vertex AI Imagen
             </p>
-          </div>
+          </Link>
           <div className="p-6 border rounded-lg">
             <h2 className="text-xl font-semibold mb-2">Videos</h2>
             <p className="text-sm text-muted-foreground">
