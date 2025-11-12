@@ -56,6 +56,12 @@ services:
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/callback/google}
       ALLOWED_ORIGINS: http://localhost:3000,http://localhost
+      SKIP_SECRETS_MANAGER: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GCP_VERTEX_PROJECT_ID: ${GCP_VERTEX_PROJECT_ID:-}
+      GCP_VERTEX_LOCATION: ${GCP_VERTEX_LOCATION:-us-central1}
+      GCP_VERTEX_SA_JSON: ${GCP_VERTEX_SA_JSON:-}
     depends_on:
       postgres:
         condition: service_healthy

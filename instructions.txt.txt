@@ -1,7 +1,7 @@
 Pulse AI Studio — Complete Cursor Build Instructions (Phased, AWS-First, IaC)
 
 Context for Cursor
-Repo: https://github.com/Samer-Is/pulse (empty at the moment — you must scaffold)
+Repo: https://github.com/Samer-Is/pulse2 (empty at the moment — you must scaffold)
 Constraints: Minimal AWS cost (use t3.micro/t4g.micro where possible), first-time AWS user, budget ~$120 credits, must be infra-as-code, no manual clicks beyond the necessary cloud console steps for credentials/domains.
 Models:
 

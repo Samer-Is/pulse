@@ -1,39 +1,60 @@
 {
-  "phase": 0,
-  "phase_name": "Repo Bootstrap",
-  "status": "completed",
+  "phase": 3,
+  "phase_name": "Provider Layer & Chat",
+  "status": "in_progress",
   "items": [
     {
-      "id": "repo_scaffold",
-      "title": "Repo scaffold created",
-      "status": "done",
-      "details": "Monorepo structure, .gitignore, .editorconfig, LICENSE, README.md, apps/web/api/workers, packages/shared"
+      "id": "provider_interfaces",
+      "title": "Provider interfaces (OpenAI, Anthropic, Google Vertex)",
+      "status": "todo",
+      "details": "Create unified provider abstraction for chat completions"
     },
     {
-      "id": "tooling_qc",
-      "title": "Lint/formatters/hooks",
-      "status": "done",
-      "details": "Prettier, ESLint, Ruff, Black, Husky commit hooks, lint-staged"
+      "id": "chat_endpoint",
+      "title": "Chat completion endpoint with streaming",
+      "status": "todo",
+      "details": "POST /chat/complete with token counting and usage tracking"
     },
     {
-      "id": "dockerized",
-      "title": "Dockerfiles and compose",
-      "status": "done",
-      "details": "Multi-stage Dockerfiles for web/api/workers + docker-compose.dev.yml with Postgres, LocalStack, Nginx"
+      "id": "secrets_integration",
+      "title": "Secrets Manager integration",
+      "status": "todo",
+      "details": "Load API keys from AWS Secrets Manager at runtime"
     },
     {
-      "id": "ci_setup",
-      "title": "GitHub Actions CI",
-      "status": "done",
-      "details": "ci.yml (lint/test/build) and deploy.yml (ECR push + EC2 deploy on tags)"
+      "id": "chat_frontend",
+      "title": "Chat UI in Next.js",
+      "status": "todo",
+      "details": "Model dropdown, streaming UI, token counter, quota display"
     }
   ],
-  "last_updated": "2025-11-12T00:30:00Z",
-  "notes": "✅ Phase 0 COMPLETE - Ready for Phase 1 (Terraform infrastructure)",
+  "completed_phases": [
+    {
+      "phase": 0,
+      "name": "Repo Bootstrap",
+      "status": "completed",
+      "completed_at": "2025-11-12"
+    },
+    {
+      "phase": 1,
+      "name": "Minimal AWS Infra (Terraform) & Secrets",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "EC2: 3.79.152.194, RDS: pulse-postgres.c744a0mkiyu2.eu-central-1.rds.amazonaws.com"
+    },
+    {
+      "phase": 2,
+      "name": "Auth, Users, Plans, Metering (API & DB)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "SQLAlchemy models, Alembic migrations, Google OAuth, JWT, full REST API"
+    }
+  ],
+  "last_updated": "2025-11-12T10:00:00Z",
+  "notes": "🚀 Starting Phase 3: Provider abstraction and chat implementation",
   "next_phase": {
-    "phase": 1,
-    "name": "Minimal AWS Infra (Terraform) & Secrets",
-    "status": "ready"
+    "phase": 4,
+    "name": "Image Generation (Vertex AI Imagen)",
+    "status": "pending"
   }
 }
-

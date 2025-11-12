@@ -19,8 +19,16 @@ from .middleware.security import SecurityHeadersMiddleware
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
+    from .utils.secrets import load_secrets_to_env
+    
+    # Load secrets from AWS Secrets Manager
+    load_secrets_to_env()
+    
+    # Initialize database
     await init_db()
+    
     yield
+    
     # Shutdown
     await close_db()
 
