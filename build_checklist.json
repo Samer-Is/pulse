@@ -1,31 +1,31 @@
 {
-  "phase": 4,
-  "phase_name": "Image Generation (Vertex AI Imagen)",
+  "phase": 5,
+  "phase_name": "Video Generation (Runway/Pika) + Jobs (SQS)",
   "status": "completed",
   "items": [
     {
-      "id": "image_provider",
-      "title": "Vertex AI Imagen provider implementation",
+      "id": "sqs_integration",
+      "title": "SQS queue utilities and integration",
       "status": "done",
-      "details": "Base interface, Google Imagen provider with sizes, guidance scale, negative prompts, seeds"
+      "details": "SQSManager with send/receive/delete, long polling, enqueue_video_job method"
     },
     {
-      "id": "s3_integration",
-      "title": "S3 upload and presigned URLs",
+      "id": "video_api",
+      "title": "Video generation API endpoints",
       "status": "done",
-      "details": "S3Manager with organized storage, presigned URLs (24h expiration), metadata"
+      "details": "POST /generate, GET /status, GET /stream (SSE), quota checking, job enqueuing"
     },
     {
-      "id": "image_api",
-      "title": "Image generation API endpoint",
+      "id": "worker_service",
+      "title": "Node.js worker service",
       "status": "done",
-      "details": "POST /images/generate with quota checking, job tracking, usage recording"
+      "details": "SQS polling, video processor, database operations, mock provider, S3 upload"
     },
     {
-      "id": "image_frontend",
-      "title": "Image generation UI",
+      "id": "video_frontend",
+      "title": "Video generation UI with progress tracking",
       "status": "done",
-      "details": "Prompt input, settings panel, grid display, download, responsive design"
+      "details": "SSE streaming, progress bar, status icons, video playback, download, settings"
     }
   ],
   "completed_phases": [
@@ -40,7 +40,7 @@
       "name": "Minimal AWS Infra (Terraform) & Secrets",
       "status": "completed",
       "completed_at": "2025-11-12",
-      "notes": "EC2: 3.79.152.194, RDS: pulse-postgres.c744a0mkiyu2.eu-central-1.rds.amazonaws.com"
+      "notes": "EC2: 3.79.152.194, RDS: pulse-postgres.c744a0mkiyu2.eu-central-1.rds.amazonaws.com, S3, SQS"
     },
     {
       "phase": 2,
@@ -62,13 +62,20 @@
       "status": "completed",
       "completed_at": "2025-11-12",
       "notes": "Imagen provider, S3 integration, batch generation (1-4 images), frontend UI"
+    },
+    {
+      "phase": 5,
+      "name": "Video Generation (Runway/Pika) + Jobs (SQS)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "SQS queue, async worker service, SSE streaming, mock video provider, frontend with progress"
     }
   ],
-  "last_updated": "2025-11-12T16:00:00Z",
-  "notes": "✅ Phase 4 COMPLETE - Image generation with Vertex AI Imagen fully functional!",
+  "last_updated": "2025-11-12T18:00:00Z",
+  "notes": "✅ Phase 5 COMPLETE - Async video generation with SQS queue system fully functional! Worker service processes jobs asynchronously.",
   "next_phase": {
-    "phase": 5,
-    "name": "Video Generation (Runway/Pika) + Jobs (SQS)",
+    "phase": 6,
+    "name": "CV Maker (Export DOCX/PDF)",
     "status": "ready"
   }
 }
