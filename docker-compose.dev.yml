@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: pulse-postgres
+    environment:
+      POSTGRES_DB: pulse
+      POSTGRES_USER: pulse
+      POSTGRES_PASSWORD: pulse
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack for AWS services (S3, SQS)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: pulse-localstack
+    ports:
+      - "4566:4566"
+      - "4571:4571"
+    environment:
+      SERVICES: s3,sqs
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: pulse-api
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+      POSTGRES_URL: postgresql://pulse:pulse@postgres:5432/pulse
+      AWS_REGION: eu-central-1
+      S3_BUCKET_NAME: pulse-dev-exports
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/pulse-jobs
+      AWS_ENDPOINT_URL: http://localstack:4566
+      JWT_SECRET: dev-secret-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_started
+    volumes:
+      - ./apps/api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Next.js Frontend (dev mode)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: deps
+    container_name: pulse-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./packages/shared:/app/packages/shared
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+    command: sh -c "cd /app/apps/web && pnpm dev"
+    depends_on:
+      - api
+
+  # Worker Service
+  workers:
+    build:
+      context: .
+      dockerfile: apps/workers/Dockerfile
+    container_name: pulse-workers
+    environment:
+      NODE_ENV: development
+      AWS_REGION: eu-central-1
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/pulse-jobs
+      AWS_ENDPOINT_URL: http://localstack:4566
+      POSTGRES_URL: postgresql://pulse:pulse@postgres:5432/pulse
+    depends_on:
+      - postgres
+      - localstack
+      - api
+    volumes:
+      - ./apps/workers:/app/apps/workers
+    command: sh -c "cd /app/apps/workers && pnpm dev"
+
+  # Nginx Reverse Proxy (optional for local dev)
+  nginx:
+    image: nginx:alpine
+    container_name: pulse-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  localstack_data:
+

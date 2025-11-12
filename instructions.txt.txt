@@ -1,586 +1,533 @@
+Pulse AI Studio — Complete Cursor Build Instructions (Phased, AWS-First, IaC)
 
+Context for Cursor
+Repo: https://github.com/Samer-Is/pulse (empty at the moment — you must scaffold)
+Constraints: Minimal AWS cost (use t3.micro/t4g.micro where possible), first-time AWS user, budget ~$120 credits, must be infra-as-code, no manual clicks beyond the necessary cloud console steps for credentials/domains.
+Models:
 
-CURSOR MASTER BUILD PROMPT — “Pulse AI Studio” — AWS, Zero-Touch
+Chat: OpenAI (GPT-4/5), Anthropic (Claude 3.5/4.x), Google (Gemini via Vertex AI)
 
-You are building AI Studio: an Arabic-first, all-in-one AI workspace for Jordan priced at 3/5/7 JDs.
-Ship a working MVP with no manual AWS console work (Terraform + GitHub Actions OIDC).
-Continuously log everything to /docs/ACTIVITY.md and gate delivery via /docs/CHECKLIST.md.
+Image: Google Vertex AI Imagen (user wrote “nano banana” → treat as Gemini/Imagen image model on Vertex)
 
-0) Product Scope (v1)
+Video: Runway or Pika (Veo3 not publicly available)
+UX: Single app with tabs: Chat, Images, Videos, CV Maker, Slide Maker. A Model dropdown appears where relevant.
+Auth: Google OAuth only at first (to avoid email domain setup).
+Payments: Manual verification first (bank transfer & admin toggle), later add PayPal/HyperPay adapters.
+Metering: Per-plan monthly quotas (3/4/5 JOD tiers), token count (chat), image count, video seconds, export limits.
+Logging: Append every major step (success/error) to docs/ACTIVITY.md. Update build_checklist.json as tasks complete.
+Non-negotiables: Input validation, rate limiting, robust error paths, secrets in AWS Secrets Manager (never in Git).
 
-Core tabs in the app (visible in sidebar + top nav):
+Phase 0 — Repo Bootstrap (Monorepo, Tooling, Guardrails)
 
-AI Chat (multi-model dropdown: GPT-4/5, Claude 4.5, Gemini Pro, and exposed names; default OpenAI)
+Goal: Create a production-ready monorepo scaffold with CI/CD, Docker, basic docs, and guardrails.
 
-CV Maker (guided form → ATS-friendly CV in Arabic/English; export PDF/DOCX)
+Tasks (do in order):
 
-Slide Maker (prompt → slides → export PPTX/PDF)
+Initialize repo
 
-Image (Editor + Generator) — model dropdown includes Nano Banana and fallback (Replicate/Stability)
+Create top-level structure:
 
-Video (Editor + Generator) — model dropdown includes Veo3 (stub if SDK private) and fallback (Pika/Runway stub)
+/apps
+  /web          # Next.js (TypeScript) – UI
+  /api          # FastAPI (Python) – provider orchestration, metering, exports
+  /workers      # Node worker or Python worker for async jobs (video queue)
+/infra
+  /terraform    # IaC for AWS (modules for vpc, ec2, rds, s3, sqs, secrets)
+    /modules/{vpc, ec2, rds, s3, sqs, secrets, ecr}
+/packages
+  /shared       # Shared TS types & utils (OpenAPI client, plan definitions)
+/docs
+  ACTIVITY.md
+build_checklist.json
+.github/workflows/{ci.yml, deploy.yml}
+.editorconfig
+.gitignore
+LICENSE
+README.md
 
-Plans & Limits (seed in DB):
 
-Starter (3 JD): 150k tokens/mo, 10 images, 0–2 short videos
+Populate README.md with a 1-page overview + local dev quickstart.
 
-Pro (5 JD): 400k tokens, 30 images, 5 short videos, PDF summary + Slide Maker
+Create docs/ACTIVITY.md with a section “Cursor activity log” and append a timestamped entry for every change you make.
 
-Creator (7 JD): 1M tokens, 60 images, 10 short videos, long prompts & advanced editors
-Add-ons: 1 JD → +200k tokens or +10 images or +1 video
+Create build_checklist.json (see template below).
 
-Payment: HyperPay driver (test mode), abstraction for PayTabs / ZainCash (stubs).
-Auth: Email magic link (SES); SMS OTP abstraction placeholder.
-Usage: Strict per-plan metering, 80% warn, 100% hard stop.
+Tooling & Quality
 
-1) Architecture (final)
+Prettier + ESLint for TS, Ruff + Black for Python.
 
-Frontend: Next.js 15 (App Router), TypeScript, Tailwind, shadcn/ui, React Query
+Commit hooks (Husky) to lint/format.
 
-Backend API: FastAPI (Python 3.11) — auth, plans, payments, usage, files, CV/Slides generation orchestration
+Conventional commits and release-please (optional) for tagging.
 
-AI Gateway: FastAPI (Python) — model router + usage metering + rate limiting; providers:
+Docker
 
-OpenAI (GPT-4/5), Anthropic (Claude 4.5), Google (Gemini)
+apps/web/Dockerfile (Next.js standalone build), apps/api/Dockerfile (FastAPI + Uvicorn), apps/workers/Dockerfile.
 
-Nano Banana (images) — integrate official SDK if exists; else REST client stub with env-config endpoints
-
-Veo3 (video) — same approach (SDK or REST client stub)
-
-Replicate/Stability/Pika as fallbacks
-
-Async Worker: Python (payments webhooks, video jobs, thumbnailing, analytics)
-
-DB: Aurora PostgreSQL Serverless v2
-
-Cache/Rate-limit: ElastiCache Redis
-
-Storage: S3 (assets, quarantine) + presigned URLs
-
-Containers: Docker → ECR → ECS Fargate (frontend, backend, gateway, worker)
-
-Network: VPC (3 AZ), ALB → ECS services (private subnets), NAT for egress
-
-CDN: CloudFront for frontend + media
-
-Email: SES (magic link).
-
-Secrets: AWS Secrets Manager (all API keys + DSNs)
-
-TLS/Domain: ACM + Route 53 (optional; default to ALB/CF domains)
-
-Observability: CloudWatch logs/metrics, X-Ray traces, JSON logs with trace_id
-
-Non-functional: P95 chat latency < 2.5s; structured logs; content moderation stub.
-
-2) Monorepo Layout
-ai-studio/
-  .editorconfig
-  .gitignore
-  .gitattributes
-  README.md
-  SECURITY.md
-  LICENSE
-  docker/
-    backend.Dockerfile
-    gateway.Dockerfile
-    frontend.Dockerfile
-    worker.Dockerfile
-  apps/
-    frontend/
-      app/
-        (routes) /(landing), /app/chat, /app/cv, /app/slides, /app/image, /app/video, /app/account
-      components/
-        ModelSelector.tsx
-        TokenMeter.tsx
-        PlanCard.tsx
-        PayButton.tsx
-        UsageBadge.tsx
-        Editors/{ImageEditor.tsx, VideoEditor.tsx}
-        Forms/{CvForm.tsx, SlidesForm.tsx}
-      lib/
-      public/demo/
-      styles/
-      next.config.js
-      package.json
-      tsconfig.json
-      tailwind.config.ts
-      postcss.config.js
-      .env.example
-    backend/
-      src/
-        main.py
-        api/v1/{auth.py, payments.py, usage.py, plans.py, files.py, cv.py, slides.py}
-        core/{config.py, security.py, db.py, logging.py, dependencies.py}
-        models/{user.py, plan.py, usage.py, payment.py, file.py, job.py}
-        schemas/{auth.py, payments.py, plans.py, usage.py, files.py, cv.py, slides.py}
-        services/{emails.py, files.py, slides_pptx.py, cv_docx.py}
-        services/payments/{base.py, hyperpay.py, paytabs.py, zaincash.py}
-        migrations/
-      pyproject.toml
-      .env.example
-    gateway/
-      src/
-        main.py
-        core/{config.py, logging.py, rate_limit.py, provider_router.py, usage_meter.py, moderation.py}
-        providers/{openai_client.py, anthropic_client.py, google_client.py, nano_banana_client.py, veo3_client.py, replicate_client.py}
-        routes/{chat.py, images.py, video.py}
-        models/{usage_log.py}
-        schemas/{chat.py, images.py, video.py}
-      pyproject.toml
-      .env.example
-    worker/
-      src/
-        main.py
-        jobs/{payments_webhooks.py, video_finalize.py, analytics.py, cleanup.py}
-      pyproject.toml
-      .env.example
-  infra/
-    terraform/
-      backend.tf              # S3 state + Dynamo lock
-      versions.tf
-      providers.tf
-      variables.tf
-      terraform.tfvars.example
-      outputs.tf
-      main.tf                 # root wiring; bootstraps state if missing
-      modules/
-        vpc/
-        ecr/
-        ecs/
-        alb/
-        rds/
-        redis/
-        s3/
-        cloudfront/
-        acm/
-        route53/
-        ses/
-        iam/
-        secrets/
-        observability/
-  scripts/
-    dev_bootstrap.sh
-    update_ecs_images.sh
-    format_check.sh
-    lint_check.sh
-  .github/
-    workflows/
-      infra.yml
-      app.yml
-  docs/
-    ARCHITECTURE.md
-    RUNBOOK.md
-    MARKETING_PLAYBOOK.md
-    API_CONTRACTS.md
-    CHECKLIST.md
-    ACTIVITY.md
+Root docker-compose.dev.yml for local multi-container dev.
 
+CI
 
-Rule: After every significant step, append to /docs/ACTIVITY.md: what ran, errors, fixes, commit, CI links, endpoints.
+ci.yml: lint, type-check, build Docker images.
 
-3) UI/UX Requirements
+deploy.yml: on tag → build/push to ECR and trigger remote deploy on EC2.
 
-Arabic by default, English toggle.
+Acceptance:
 
-Sidebar (fixed): Chat, CV, Slides, Image, Video, Account.
+pnpm dev (for web) and uvicorn (for api) run locally with docker compose.
 
-Model dropdown shown in Chat, Image, Video pages.
+First CI green; docs/ACTIVITY.md shows your steps; build_checklist.json updated.
 
-Chat models: GPT-4/5, Claude 4.5, Gemini Pro.
+build_checklist.json template:
 
-Image models: Nano Banana (default), fallback Replicate/Stability.
+{
+  "phase": 0,
+  "items": [
+    {"id": "repo_scaffold", "title": "Repo scaffold created", "status": "todo"},
+    {"id": "tooling_qc", "title": "Lint/formatters/hooks", "status": "todo"},
+    {"id": "dockerized", "title": "Dockerfiles and compose", "status": "todo"},
+    {"id": "ci_setup", "title": "GitHub Actions CI", "status": "todo"}
+  ],
+  "last_updated": ""
+}
 
-Video models: Veo3 (default), fallback Pika/Runway (stub).
+Phase 1 — Minimal AWS Infra (Terraform) & Secrets
 
-TokenMeter (per plan) visible on all tool pages.
+Goal: Provision the smallest viable AWS footprint via Terraform.
 
-CV Maker: guided form (name, contact, skills, experience, education), ATS toggle, Arabic/English selector; export DOCX/PDF.
+Architecture (minimal cost):
 
-Slide Maker: form with topic, audience, #slides; export PPTX/PDF (use python-pptx).
+VPC (two subnets), Security Groups
 
-Image: editor (basic crop/resize, text overlay) + generator (prompt→grid).
+EC2 t3.micro (Amazon Linux 2023) running Docker Compose (reverse proxy Nginx + web + api + worker).
 
-Video: upload short clip to edit (trim, captions) or generate short (≤15–20s) using model prompt; show queue state.
+RDS Postgres (db.t4g.micro) for auth, plans, metering.
 
-Account: plan, usage meters, invoices, add-ons, cancel/renew.
+S3 for user exports (PDFs, PPTX, images/video outputs) + presigned URLs.
 
-4) API Contracts (document in /docs/API_CONTRACTS.md + OpenAPI)
+SQS queue for video jobs.
 
-Backend (FastAPI)
+Secrets Manager for all API keys (OpenAI, Anthropic, Vertex SA JSON, Runway/Pika, OAuth secrets).
 
-POST /v1/auth/magic-link (email)
+ECR for container images.
 
-POST /v1/auth/magic-link/verify
+Tasks:
 
-GET /v1/plans
+infra/terraform/modules/* — write reusable modules for vpc, ec2, rds, s3, sqs, ecr, secrets.
 
-POST /v1/payments/session (provider=hyperpay, plan_id) → {redirectUrl}
+infra/terraform/environments/dev — compose modules; outputs: EC2 public DNS, DB endpoint, bucket name, queue URL, ECR repos.
 
-POST /v1/payments/webhook/hyperpay
+User data on EC2 to install Docker, pull images, and run docker compose from /srv/pulse.
 
-GET /v1/usage/me
+Create Secrets Manager placeholders (no secrets committed).
 
-POST /v1/cv/generate (form payload) → file id + download URL
+Acceptance:
 
-POST /v1/slides/generate (topic, points) → file id + download URL
+terraform apply creates resources w/ outputs.
 
-GET /v1/files/{file_id}/signed-url
+You can SSH to EC2, Docker is installed, Nginx returns a health page.
 
-AI Gateway (FastAPI)
+Phase 2 — Auth, Users, Plans, Metering (API & DB)
 
-POST /v1/chat/complete { model, messages[], system?, tools? }
+Goal: Set up core backend (FastAPI) with Postgres models for users, plans, usage metering, admin toggles.
 
-POST /v1/images/generate { model: 'nano-banana'|..., prompt, count }
+DB schema (Alembic migrations):
 
-POST /v1/video/generate { model: 'veo3'|..., prompt, duration_s }
+users(id, email, name, auth_provider, created_at, is_admin)
 
-All endpoints: plan enforcement, usage logging, rate limiting, moderation.
+plans(id, name, monthly_price_jod, chat_tokens, image_creations, video_seconds, cv_exports, slide_exports, is_active)
 
-5) Database Schema (Aurora PG, SQLAlchemy + Alembic)
+subscriptions(id, user_id, plan_id, status, period_start, period_end, payment_method, manual_verified_by)
 
-Tables:
+usage_events(id, user_id, feature, model, input_tokens, output_tokens, image_count, video_seconds, bytes, cost_estimate, created_at)
 
-users(id, email, phone, locale, created_at, is_active)
+jobs(id, user_id, type, payload_json, status, progress, result_url, created_at, updated_at) // for video/image long tasks
 
-plans(id, name, price_jod, token_limit, image_limit, video_limit, features_json)
+admin_flags(id, key, value_json, updated_at) // e.g., maintenance mode, free trial toggles
 
-subscriptions(id, user_id, plan_id, status, renews_at, provider, external_ref)
+Auth:
 
-payments(id, user_id, plan_id, amount_jod, provider, status, external_id, created_at, meta_json)
+Google OAuth only (Supabase/Clerk avoided to keep AWS-native; use OAuth flow handled by Next.js + API with sessions via JWT stored HttpOnly).
 
-usage_logs(id, user_id, kind['tokens'|'images'|'video'], amount, model, created_at, meta_json)
+Store minimal user profile on first login.
 
-files(id, user_id, kind['image'|'video'|'doc'], s3_key, bytes, created_at, meta_json)
+API endpoints (OpenAPI documented):
 
-jobs(id, user_id, kind['video_gen'|'video_edit'], status, payload_json, result_file_id, created_at, updated_at)
+/auth/google/start, /auth/google/callback
 
-Indexes: (user_id, created_at), (kind, created_at), (model, created_at).
+/me, /plans, /subscribe/manual, /admin/verify-subscription/:id
 
-Seed plans on first migration.
+/usage/summary, /usage/events
 
-6) AWS Terraform (infra/terraform)
+Shared middleware: rate limiting, plan enforcement.
 
-Goal: terraform apply from GitHub Actions OIDC with zero console.
-Include terraform.tfvars.example:
+Acceptance:
 
-aws_account_id = "000000000000"
-aws_region     = "eu-central-1"
-project_name   = "ai-studio"
-domain_name    = ""           # optional
-hosted_zone_id = ""           # optional
+Sign in with Google works.
 
-Modules (implement all):
+Admin can mark a subscription as paid (manual).
 
-vpc: 3 AZs; public & private subnets; NAT; SGs
+Usage events recorded for test calls.
 
-ecr: repos (frontend,backend,gateway,worker) with lifecycle policy
+Phase 3 — Provider Layer & Chat
 
-ecs: cluster + Fargate services (fe public, be/gw/worker private), autoscaling; task roles; exec roles
+Goal: Unified provider abstraction + Chat completion endpoint.
 
-alb: ALB + TGs (fe/be/gw), L7 routing, 80→443 redirect (if cert)
+Provider interfaces (apps/api/app/providers/*):
 
-rds: Aurora PG Serverless v2 (min/max ACU), Secrets Manager creds
+openai_provider.py (chat)
 
-redis: ElastiCache Redis (subnet group + SG)
+anthropic_provider.py (chat)
 
-s3: ${project}-assets, ${project}-quarantine, ${project}-tfstate (state)
+google_vertex_provider.py (chat via Gemini on Vertex AI; REST w/ service account)
 
-cloudfront: distro for frontend origin (ALB) + S3 assets; ACM us-east-1 if domain
+Common types.py & router_chat.py:
 
-acm: certs for ALB region + us-east-1 (CF)
+POST /chat/complete: {message[], system?, model, temperature, ...} → streams tokens; counts tokens → emits usage_events.
 
-route53: if domain_name+hosted_zone_id → A/AAAA aliases, validation
+Secrets (via AWS Secrets Manager):
 
-ses: verify domain/email identity; outputs SMTP creds; store in Secrets Manager
+OPENAI_API_KEY, ANTHROPIC_API_KEY
 
-iam: GitHub OIDC provider; roles:
+GCP_VERTEX_PROJECT_ID, GCP_VERTEX_LOCATION, GCP_VERTEX_SA_JSON (base64 of service account key)
 
-gha-infra-role (Terraform)
+Decrypt/resolve at container start; never log secrets.
 
-gha-deploy-role (ECR push, ECS update)
+Web (Next.js):
 
-secrets: write placeholders:
+/chat page with:
 
-OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, REPLICATE_API_TOKEN
+Model dropdown: OpenAI, Anthropic, Google
 
-NANO_BANANA_API_KEY, NANO_BANANA_BASE_URL
+System prompt text area (optional), temperature slider
 
-VEO3_API_KEY, VEO3_BASE_URL
+Token counter, monthly quota progress
 
-JWT_SECRET, HYPERPAY_API_KEY, HYPERPAY_ENTITY_ID, HYPERPAY_TEST_MODE=true
+Streaming UI
 
-DATABASE_URL, REDIS_URL, S3_ASSETS_BUCKET, S3_QUAR_BUCKET
+Acceptance:
 
-SES_REGION, EMAIL_FROM
+Can chat with any of the 3 providers and see quotas decrement.
 
-observability: CloudWatch log groups; X-Ray; alarms (ALB 5xx, ECS unhealthy, RDS/Redis CPU)
+Phase 4 — Image Generation (Vertex AI Imagen)
 
-Remote state in S3 + DynamoDB lock (create via Terraform bootstrap logic; document in ACTIVITY.md).
+Goal: Image generation with model picker (default: Vertex Imagen); count image generations; store to S3.
 
-7) GitHub Actions (no long-lived keys)
+API:
 
-.github/workflows/infra.yml
+POST /image/generate → {prompt, model, size, count}
 
-Trigger: pushes to infra/** + manual
+If provider = google, call Vertex Imagen REST (text-to-image, imagefx/imagen endpoint per 2025 API).
 
-Steps: checkout → configure-aws-credentials(OIDC) → setup-terraform → init/plan/apply
+Optional: OpenAI image as a fallback.
 
-Append result to /docs/ACTIVITY.md and commit back (bot).
+Validate prompt length; return presigned S3 URLs.
 
-.github/workflows/app.yml
+Web:
 
-Trigger: pushes to apps/** or docker/** + manual
+/images page:
 
-Steps: checkout → configure-aws-credentials(OIDC) → ECR login → buildx build & push 4 images (tag = SHA) → update ECS task defs/services (script scripts/update_ecs_images.sh) → wait for stability → append to ACTIVITY.md (bot commit)
+Prompt box, seed/size, Model dropdown (Google default; OpenAI fallback)
 
-Repository secrets/vars needed:
+Grid of generated images + “Save to S3” + “Download”
 
-AWS_ACCOUNT_ID (secret), AWS_REGION (var)
+Usage bar (images remaining)
 
-Any domain vars if used
+Acceptance:
 
-Optionally CI-only e-mail for commits (bot)
+Generates images, saves to S3, records usage_events with image_count.
 
-8) Services — Config & Secrets
+Phase 5 — Video Generation (Runway/Pika) + Jobs (SQS)
 
-Use a small helper in Python to resolve aws:secretsmanager:KEY placeholders on boot (cache in memory).
+Goal: Async video generation via provider adapters, with SQS queue and worker.
 
-backend .env.example
+Flow:
 
-ENV=prod
-PORT=8080
-DATABASE_URL=aws:secretsmanager:AI_STUDIO_DATABASE_URL
-REDIS_URL=aws:secretsmanager:AI_STUDIO_REDIS_URL
-JWT_SECRET=aws:secretsmanager:AI_STUDIO_JWT_SECRET
-SES_REGION=aws:secretsmanager:AI_STUDIO_SES_REGION
-EMAIL_FROM=aws:secretsmanager:AI_STUDIO_EMAIL_FROM
-PAYMENTS_PROVIDER=hyperpay
-HYPERPAY_API_KEY=aws:secretsmanager:AI_STUDIO_HYPERPAY_API_KEY
-HYPERPAY_ENTITY_ID=aws:secretsmanager:AI_STUDIO_HYPERPAY_ENTITY_ID
-HYPERPAY_TEST_MODE=aws:secretsmanager:AI_STUDIO_HYPERPAY_TEST_MODE
-S3_ASSETS_BUCKET=aws:secretsmanager:AI_STUDIO_S3_ASSETS
-S3_QUAR_BUCKET=aws:secretsmanager:AI_STUDIO_S3_QUAR
-BASE_URL=https://app.your-domain.tld
+POST /video/generate → enqueue job {prompt, style, seconds, provider}; check plan’s video_seconds remaining.
 
+Worker polls SQS, calls Runway/Pika API, polls for completion, uploads final MP4 to S3, updates jobs row.
 
-gateway .env.example
+Client polls /jobs/:id or uses SSE /jobs/stream.
 
-ENV=prod
-PORT=8081
-REDIS_URL=aws:secretsmanager:AI_STUDIO_REDIS_URL
-OPENAI_API_KEY=aws:secretsmanager:OPENAI_API_KEY
-ANTHROPIC_API_KEY=aws:secretsmanager:ANTHROPIC_API_KEY
-GOOGLE_API_KEY=aws:secretsmanager:GOOGLE_API_KEY
-REPLICATE_API_TOKEN=aws:secretsmanager:REPLICATE_API_TOKEN
-NANO_BANANA_API_KEY=aws:secretsmanager:NANO_BANANA_API_KEY
-NANO_BANANA_BASE_URL=aws:secretsmanager:NANO_BANANA_BASE_URL
-VEO3_API_KEY=aws:secretsmanager:VEO3_API_KEY
-VEO3_BASE_URL=aws:secretsmanager:VEO3_BASE_URL
-PROVIDER_DEFAULT=openai
-TOKEN_LIMIT_WARN_PCT=0.8
-USAGE_DB_URL=aws:secretsmanager:AI_STUDIO_DATABASE_URL
+Web:
 
+/videos: Prompt, duration (defaults 4–8s), Provider dropdown (Runway/Pika), progress states, final download link.
 
-frontend .env.example
+Acceptance:
 
-NEXT_PUBLIC_API_BASE=https://api.your-domain.tld/v1
-NEXT_PUBLIC_GATEWAY_BASE=https://gateway.your-domain.tld/v1
-NEXT_PUBLIC_CDN_BASE=https://cdn.your-domain.tld
+End-to-end job lifecycle works; video_seconds decremented.
 
-9) AI Gateway (critical)
+Phase 6 — CV Maker (Export DOCX/PDF)
 
-Provider router chooses the integration based on model dropdown (payload model):
+Goal: Simple CV builder with structured form → generate DOCX and PDF.
 
-Chat: openai:gpt-4o/gpt-5, anthropic:claude-4.5, google:gemini-1.5
+Implementation:
 
-Images: nano-banana:* (default) else fallback
+Frontend form sections (Personal, Summary, Experience, Skills, Education).
 
-Video: veo3:* (default) else fallback
+API creates DOCX via python-docx templates; for PDF, render HTML with Jinja + headless Chromium (Playwright) → PDF.
 
-Usage metering: store token counts (chat) and item counts (images/videos) per user-per-month in Redis + DB (authoritative copy in DB).
+Store to S3, return presigned URLs; count cv_exports.
 
-Rate limiting: sliding window (e.g., 60 req / 60s / user).
+Acceptance:
 
-Moderation: basic text/image moderation hook before provider call; block & log.
+User can create CV, export DOCX/PDF; files persist in S3; quotas enforced.
 
-Errors: provider timeouts → map to 504; validation → 400; plan exceeded → 402 with upgrade URL.
+Phase 7 — Slide Maker (Export PPTX/PDF)
 
-10) Backend specifics
+Goal: Slide generator from outline or topic.
 
-Auth: magic link using SES (sandbox instructions in README).
+Implementation:
 
-Payments: HyperPay test checkout → webhook → mark subscription active, set renews_at.
+Frontend: input topic or outline; optional “auto-outline” (LLM call).
 
-CV Maker: convert structured form to DOCX/PDF (python-docx + weasyprint or docx-to-pdf container).
+Backend: generate content via chat provider; build PPTX with PptxGenJS (run in Node worker or server) or Python python-pptx.
 
-Slides: python-pptx to build PPTX; also export PDF (headless libreoffice container or unoconv task in worker).
+Export PPTX; optional PDF via Chromium. Count slide_exports.
 
-Files: S3 uploads via backend; downloads via presigned URLs (time-bound).
+Acceptance:
 
-Usage: /v1/usage/me returns plan & limits + month’s consumption.
+PPTX downloads, looks decent, fonts embedded; quotas enforced.
 
-11) Frontend specifics
+Phase 8 — Plans, Quotas, Admin Dashboard, Payments (Manual now, PayPal later)
 
-Pages:
+Goal: Turn on the business layer.
 
-/ Hero (Arabic), pricing cards (3/5/7 JD), demo GIF, FAQs, CTA
+Plans (seed in DB):
 
-/app/chat with ModelSelector (chat models), message list, attachments, TokenMeter
+Starter (3 JOD) — e.g., 50k chat tokens, 20 images, 30 video seconds, 1 CV, 1 Slide export
 
-/app/cv with CvForm → preview → export
+Plus (4 JOD) — higher limits
 
-/app/slides with SlidesForm → preview slides outline → export
+Pro (5 JOD) — highest limits
+(Tune later; make server-side constants so changing plan updates limits next cycle.)
 
-/app/image with ModelSelector (images), prompt input, grid, basic editor
+Admin:
 
-/app/video with ModelSelector (video), prompt or upload, queue status
+/admin page: users, subscriptions, manual verify button, usage search, job monitor.
 
-/app/account with plan, usage, invoices, add-ons, cancel/renew
+Payments:
 
-Arabic UX: RTL styles for Arabic; toggle to English.
+Manual: /subscribe/manual issues invoice ref; admin toggles verified.
 
-State: React Query; JWT stored as httpOnly cookie; CSRF protection.
+Adapters: Provide interfaces for PayPal & HyperPay; keep feature-flagged off until configured.
 
-Errors: Friendly banners for quota exceeded, payment required.
+Acceptance:
 
-12) CI/CD & Scripts
+Users can pick a plan, be marked paid, and limits apply immediately.
 
-scripts/update_ecs_images.sh — reads cluster/service names from Terraform outputs; updates task defs with SHA tags.
+Phase 9 — Observability, Security, Rate Limits
 
-CI: lint/typecheck, unit tests, build images, push, roll services.
+Goal: Be safe and observable.
 
-Infra CI: plan/apply, attach outputs to job summary, append to ACTIVITY.md and commit.
+Tasks:
 
-13) Docs
+Structured logs (JSON) to stdout; Nginx access logs.
 
-ARCHITECTURE.md — diagrams + dataflow (FE→BE→GW→Providers; payments; files).
+Basic tracing (OpenTelemetry) between web ↔ api ↔ worker.
 
-RUNBOOK.md — how to rotate keys, restore DB, clear stuck jobs, throttle abusers.
+Rate limiting (per IP + per user).
 
-MARKETING_PLAYBOOK.md — 30 Arabic reel scripts, landing copy (AR/EN), referral copy.
+Input validation with Pydantic + Zod.
 
-API_CONTRACTS.md — request/response JSON schemas; headers; error codes.
+CSP, CSRF, secure cookies, HTTPS (when domain added).
 
-CHECKLIST.md — build gates; must be ticked before release.
+Backup script for RDS snapshots nightly (Terraform + event rule).
 
-ACTIVITY.md — continuous chronological log (every commit & CI run appends).
+Acceptance:
 
-14) CHECKLIST (initial content — keep updating)
+Logs visible, rate limits tested, snapshot rules present.
 
-Infra
+Phase 10 — Deploy to AWS (ECR → EC2 via Compose)
 
- Remote state S3 + Dynamo created automatically
+Goal: CI/CD path from GitHub to AWS.
 
- OIDC roles (gha-infra-role, gha-deploy-role) created by Terraform
+Tasks:
 
- VPC, ALB, ECS cluster/services (fe/be/gw/worker) healthy
+GitHub Actions builds images, pushes to ECR, then SSH to EC2 to:
 
- Aurora PG up; DSN stored in Secrets Manager
+Pull latest images,
 
- ElastiCache Redis reachable from ECS tasks
+Write .env from Secrets Manager values (rendered by a small bootstrap script),
 
- S3 buckets assets/quarantine created
+docker compose up -d --remove-orphans.
 
- CloudFront active (or ALB default domain fallback)
+Health checks pass; app reachable on EC2 public DNS.
 
- SES identity verified; sandbox tested
+Acceptance:
 
- Route53/ACM configured if domain provided
+Green deploy, services healthy, real traffic works.
 
-App
+Frontend Details (Next.js + Tailwind + shadcn/ui)
 
- Magic link login (SES) works end-to-end
+Routes:
+/ (dashboard), /chat, /images, /videos, /cv, /slides, /account, /admin
+Components:
 
- Plans seeded (3/5/7 JD)
+ModelPicker (provider + model dropdown)
 
- HyperPay test session→webhook→subscription active
+QuotaBar (feature-specific)
 
- Chat works; dropdown model selection; usage increments
+JobProgress (for videos)
 
- Image page generates via Nano Banana; counts against image quota
+ExportCard (download/share)
 
- Video page submits to Veo3 (or stub) and returns file; counts quota
+Style: Clean, minimal, tabs top; clear quotas and plan CTAs.
 
- CV Maker exports DOCX/PDF; Slide Maker exports PPTX/PDF
+Environment & Secrets (load from AWS Secrets Manager at runtime)
 
- Account shows accurate monthly usage & invoices
+Secrets to create (names you must use):
 
-Gateway
+OPENAI_API_KEY
 
- Per-model routing works (openai/anthropic/google/nano-banana/veo3)
+ANTHROPIC_API_KEY
 
- Quota 80% warn / 100% stop enforced
+GCP_VERTEX_PROJECT_ID
 
- Sliding window rate limiting
+GCP_VERTEX_LOCATION (e.g., us-central1)
 
- Moderation hooks before providers
+GCP_VERTEX_SA_JSON (base64 of service account JSON)
 
-CI/CD
+RUNWAY_API_KEY and/or PIKA_API_KEY
 
- infra.yml applies cleanly on main
+GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET
 
- app.yml builds, pushes, and rolls ECS zero-downtime
+POSTGRES_URL (from RDS)
 
- /docs/ACTIVITY.md auto-updated from CI
+S3_BUCKET_NAME, AWS_REGION
 
-15) Initial Execution Plan (do this now)
+SQS_QUEUE_URL
 
-Scaffold monorepo & baseline files.
+JWT_SECRET
 
-Implement Backend minimal: health, magic link (SES sandbox), plans seed, payments session/webhook, usage, files, CV/Slides generators.
+Never commit secrets. API containers should read from env that your bootstrap script resolves from Secrets Manager on start.
 
-Implement Gateway minimal: /chat/complete, /images/generate (Nano Banana), /video/generate (Veo3); metering + rate limit + moderation.
+Vertex AI (Google) — How to get credentials (for images/chat)
 
-Implement Frontend pages and ModelSelector components for Chat/Image/Video.
+In Google Cloud Console: create a Project → enable Vertex AI API.
 
-Write Terraform modules; default to ALB/CF managed domains if Route53 not provided.
+Create a Service Account, grant roles: Vertex AI User, Storage Object Viewer.
 
-Create GitHub Actions (infra/app) with OIDC roles from Terraform; ensure bot appends to ACTIVITY.md.
+Create a Key (JSON); download; base64 encode it locally.
 
-First main push → infra up. Second main push → images built & deployed.
+In AWS Secrets Manager, set GCP_VERTEX_SA_JSON to that base64 string; set GCP_VERTEX_PROJECT_ID and GCP_VERTEX_LOCATION.
 
-Record every step, errors, fixes, outputs, endpoints to /docs/ACTIVITY.md.
+API code: use SA JWT to call Vertex endpoints (Imagen for image; Gemini for chat) over REST.
 
-Tick items in /docs/CHECKLIST.md as they pass.
+(You asked earlier about “Vertx AI keys”: this is the flow—no classic “API key”, use service account credentials.)
 
-16) Provider Stubs (if SDKs private)
+Nginx & Runtime Topology (on EC2)
 
-Nano Banana: create providers/nano_banana_client.py with env NANO_BANANA_BASE_URL, NANO_BANANA_API_KEY; implement:
+:80 → Nginx →
 
-generate_images(prompt: str, count: int) -> List[S3Key]
+/ → web:3000
 
-If endpoint unknown, mock by calling Replicate/Stability underneath but keep the API name and wiring identical, so swapping is trivial.
+/api/* → api:8000 (FastAPI)
 
-Veo3: providers/veo3_client.py with env VEO3_BASE_URL, VEO3_API_KEY; implement:
+/sse/* → api:8000 (keep-alive, tuned timeouts)
 
-generate_video(prompt: str, duration_s: int) -> JobId
+workers run headless; connect to SQS and S3.
 
-get_video(job_id) -> {status, s3_key}
+Rate Limits & Quotas (examples)
 
-If endpoint unknown, mock with a queued worker job that stitches stock clips (FFmpeg) and returns quickly; keep interface compatible.
+Per-user: 60 req/min to /chat/complete + daily caps,
 
-Clearly document in ACTIVITY.md whether live or stub is used.
+Per-IP: 120 req/min overall,
 
-17) Acceptance Tests
+Quotas from plans enforced before calling providers; return 402 Plan limit exceeded JSON when out.
 
-Health checks 200 for BE & GW.
+Error Budget & Risks (reality check)
 
-SES magic link delivers (sandbox path documented).
+Timeline: Even with Cursor, this is ~3–4 weeks for a robust v1. Trying to do all five tools in 1 day will break quality and burn time later.
 
-Payment test flow sets subscription active.
+Costs: RDS + EC2 + S3 + ECR + SQS should stay low on micro tiers, but video jobs and image gen can spike provider bills—keep strict quotas.
 
-Chat (GPT-4o) produces text; TokenMeter updates.
+Model drift/availability: Veo3 unavailable; rely on Runway/Pika adapters.
 
-Image (Nano Banana) returns images saved in S3; counts against plan.
+Payments in Jordan: Start manual or PayPal; HyperPay integration can come after traction.
 
-Video (Veo3) returns an asset (stub acceptable for MVP) and counts.
+Admin Playbook
 
-CV/Slides export produce correct files downloadable via presigned URLs.
+Toggle free trial days in admin_flags.
 
-CloudFront/ALB URL publicly serves frontend.
+View job queue health and requeue failed jobs.
 
-Mark ✅ in CHECKLIST.md and include links/screenshots in ACTIVITY.md.
+Manually verify payments during MVP.
 
-End of rewritten instructions.
-If you want, I can also generate a starter pack of actual code files (Terraform module skeletons, Dockerfiles, minimal FastAPI endpoints, and the Next.js pages + ModelSelector) so Cursor has concrete anchors to extend.
+Adjust plans server-side only (immutable history for past subscriptions).
+
+Local Dev Quickstart (for README)
+# 1) Prereqs
+pnpm i --frozen-lockfile
+python -m venv .venv && source .venv/bin/activate && pip install -r apps/api/requirements.txt
+
+# 2) Start dev stack
+docker compose -f docker-compose.dev.yml up --build
+
+# 3) Seed DB
+alembic upgrade head && python apps/api/scripts/seed_plans.py
+
+# 4) Visit
+open http://localhost:3000
+
+Minimal .env.example (local only; prod uses Secrets Manager)
+NODE_ENV=development
+NEXT_PUBLIC_API_BASE=http://localhost:8000
+JWT_SECRET=replace_me_local_only
+POSTGRES_URL=postgresql://user:pass@localhost:5432/pulse
+S3_BUCKET_NAME=pulse-dev-exports
+AWS_REGION=eu-central-1
+SQS_QUEUE_URL=http://localstack:4566/000000000000/pulse-jobs
+OPENAI_API_KEY=sk-XXX
+ANTHROPIC_API_KEY=... 
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+GCP_VERTEX_PROJECT_ID=your-project
+GCP_VERTEX_LOCATION=us-central1
+GCP_VERTEX_SA_JSON=base64-blob
+RUNWAY_API_KEY=...
+PIKA_API_KEY=...
+
+What to build first (exact Cursor order of operations)
+
+Phase 0: scaffold repo, add CI, Docker, checklist/logging.
+
+Phase 1: Terraform modules (VPC, EC2, RDS, S3, SQS, ECR, Secrets). terraform apply and record outputs.
+
+Phase 2: FastAPI + Postgres + OAuth (Google) + plans/usage models + admin endpoints.
+
+Phase 3: Chat provider adapters + streaming + token accounting + UI chat page.
+
+Phase 4: Image gen via Vertex (Imagen) + S3 storage + UI page.
+
+Phase 5: SQS jobs + worker + Runway/Pika adapters + video page.
+
+Phase 6: CV maker (DOCX/PDF) + quotas.
+
+Phase 7: Slide maker (PPTX/PDF) + quotas.
+
+Phase 8: Admin dashboard + manual payments + PayPal adapter (flagged off).
+
+Phase 9: Observability, rate limits, backups.
+
+Phase 10: CI/CD to ECR + deploy to EC2 w/ docker compose + health checks.
+
+Each time you complete a sub-task, append a line to docs/ACTIVITY.md with date/time, what changed, and any errors/fixes, and update the relevant item in build_checklist.json from "todo" → "doing" → "done" (refresh the last_updated timestamp).
+
+Acceptance Test Matrix (short)
+
+Auth: Login via Google; no account → auto create; session persists.
+
+Plans: Switching plan updates quotas next cycle; over-limit returns 402.
+
+Chat: Providers switch correctly; token accounting sensible ±5%.
+
+Images: Vertex call works; S3 links valid for 15 min; usage increments.
+
+Videos: Job queued → running → success; retries on 5xx; usage decremented by seconds.
+
+CV/Slides: Exports both DOCX/PDF/PPTX; files < 10 MB; Arabic text acceptable but not required.
+
+Infra: EC2 low CPU at idle; RDS snapshots created; Secrets never logged.
+
+Security: Rate limits enforced; CSP header present; cookies HttpOnly/SameSite=Lax.

@@ -1,0 +1,112 @@
+name: Deploy to AWS
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-central-1.amazonaws.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/pulse-web:${{ steps.version.outputs.VERSION }}
+            ${{ env.ECR_REGISTRY }}/pulse-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Build and push api image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/pulse-api:${{ steps.version.outputs.VERSION }}
+            ${{ env.ECR_REGISTRY }}/pulse-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Build and push workers image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/workers/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/pulse-workers:${{ steps.version.outputs.VERSION }}
+            ${{ env.ECR_REGISTRY }}/pulse-workers:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "$EC2_SSH_KEY" > ec2_key.pem
+          chmod 600 ec2_key.pem
+          
+          # SSH and deploy
+          ssh -o StrictHostKeyChecking=no -i ec2_key.pem $EC2_USER@$EC2_HOST << 'EOF'
+            cd /srv/pulse
+            
+            # Login to ECR
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+              docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+            
+            # Pull latest images
+            docker pull ${{ env.ECR_REGISTRY }}/pulse-web:latest
+            docker pull ${{ env.ECR_REGISTRY }}/pulse-api:latest
+            docker pull ${{ env.ECR_REGISTRY }}/pulse-workers:latest
+            
+            # Update and restart services
+            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            
+            # Clean up old images
+            docker image prune -f
+          EOF
+          
+          rm ec2_key.pem
+          
+      - name: Verify deployment
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          sleep 10
+          curl -f http://$EC2_HOST/health || exit 1
+          echo "Deployment successful!"
+
