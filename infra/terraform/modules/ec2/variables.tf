@@ -24,7 +24,7 @@ variable "security_group_id" {
 variable "root_volume_size" {
   description = "Size of root volume in GB"
   type        = number
-  default     = 20
+  default     = 30
 }
 
 variable "aws_region" {

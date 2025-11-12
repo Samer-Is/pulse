@@ -66,7 +66,7 @@ module "rds" {
   master_username        = var.database_username
   db_subnet_group_name   = module.vpc.db_subnet_group_name
   security_group_id      = module.vpc.rds_security_group_id
-  backup_retention_days  = 7
+  backup_retention_days  = 0
   skip_final_snapshot    = var.skip_final_snapshot
   deletion_protection    = var.deletion_protection
   tags                   = local.common_tags
@@ -125,7 +125,7 @@ module "ec2" {
   instance_type        = var.ec2_instance_type
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_id    = module.vpc.ec2_security_group_id
-  root_volume_size     = 20
+  root_volume_size     = 30
   aws_region           = var.aws_region
   s3_bucket_arn        = module.s3.bucket_arn
   sqs_queue_arn        = module.sqs.queue_arn

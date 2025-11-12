@@ -54,7 +54,7 @@ variable "security_group_id" {
 variable "backup_retention_days" {
   description = "Number of days to retain backups"
   type        = number
-  default     = 7
+  default     = 0
 }
 
 variable "skip_final_snapshot" {

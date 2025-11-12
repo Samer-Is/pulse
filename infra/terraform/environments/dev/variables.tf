@@ -54,7 +54,7 @@ variable "rds_instance_class" {
 variable "postgres_version" {
   description = "PostgreSQL version"
   type        = string
-  default     = "16.1"
+  default     = "15.14"
 }
 
 variable "rds_allocated_storage" {
