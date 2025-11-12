@@ -1,31 +1,31 @@
 {
-  "phase": 3,
-  "phase_name": "Provider Layer & Chat",
+  "phase": 4,
+  "phase_name": "Image Generation (Vertex AI Imagen)",
   "status": "completed",
   "items": [
     {
-      "id": "provider_interfaces",
-      "title": "Provider interfaces (OpenAI, Anthropic, Google Vertex)",
+      "id": "image_provider",
+      "title": "Vertex AI Imagen provider implementation",
       "status": "done",
-      "details": "Base provider interface, OpenAI with tiktoken, Anthropic with streaming, Google Vertex with service account"
+      "details": "Base interface, Google Imagen provider with sizes, guidance scale, negative prompts, seeds"
     },
     {
-      "id": "chat_endpoint",
-      "title": "Chat completion endpoint with streaming",
+      "id": "s3_integration",
+      "title": "S3 upload and presigned URLs",
       "status": "done",
-      "details": "POST /chat/complete and /chat/stream with Server-Sent Events, quota checking, usage tracking"
+      "details": "S3Manager with organized storage, presigned URLs (24h expiration), metadata"
     },
     {
-      "id": "secrets_integration",
-      "title": "Secrets Manager integration",
+      "id": "image_api",
+      "title": "Image generation API endpoint",
       "status": "done",
-      "details": "Load API keys from AWS Secrets Manager at startup, SKIP_SECRETS_MANAGER for local dev"
+      "details": "POST /images/generate with quota checking, job tracking, usage recording"
     },
     {
-      "id": "chat_frontend",
-      "title": "Chat UI in Next.js",
+      "id": "image_frontend",
+      "title": "Image generation UI",
       "status": "done",
-      "details": "Full-page chat with streaming, model dropdown, settings panel, temperature slider, system prompt"
+      "details": "Prompt input, settings panel, grid display, download, responsive design"
     }
   ],
   "completed_phases": [
@@ -55,13 +55,20 @@
       "status": "completed",
       "completed_at": "2025-11-12",
       "notes": "OpenAI/Anthropic/Google providers, streaming chat, usage tracking, frontend UI"
+    },
+    {
+      "phase": 4,
+      "name": "Image Generation (Vertex AI Imagen)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "Imagen provider, S3 integration, batch generation (1-4 images), frontend UI"
     }
   ],
-  "last_updated": "2025-11-12T14:00:00Z",
-  "notes": "✅ Phase 3 COMPLETE - Chat system fully functional with streaming support!",
+  "last_updated": "2025-11-12T16:00:00Z",
+  "notes": "✅ Phase 4 COMPLETE - Image generation with Vertex AI Imagen fully functional!",
   "next_phase": {
-    "phase": 4,
-    "name": "Image Generation (Vertex AI Imagen)",
+    "phase": 5,
+    "name": "Video Generation (Runway/Pika) + Jobs (SQS)",
     "status": "ready"
   }
 }
