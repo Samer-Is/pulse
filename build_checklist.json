@@ -1,37 +1,43 @@
 {
-  "phase": 7,
-  "phase_name": "Slide Maker (Export PPTX/PDF)",
+  "phase": 8,
+  "phase_name": "Plans, Quotas, Admin Dashboard & Payments (Stripe)",
   "status": "completed",
   "items": [
     {
-      "id": "slide_schemas",
-      "title": "Slide data models and schemas",
+      "id": "stripe_integration",
+      "title": "Stripe payment integration",
       "status": "done",
-      "details": "SlideContent, SlideGenerationRequest/Response, OutlineGeneration schemas"
+      "details": "Checkout sessions, customer portal, webhook handling, subscription sync"
     },
     {
-      "id": "slide_generator",
-      "title": "PPTX and PDF generation service",
+      "id": "quota_enforcement",
+      "title": "Quota checking and enforcement",
       "status": "done",
-      "details": "python-pptx for PPTX, Playwright for PDF, professional templates, speaker notes"
+      "details": "Chat tokens, images, videos, CVs, slides quota checks with increment functions"
     },
     {
-      "id": "ai_outline",
-      "title": "AI-powered outline generation",
+      "id": "subscription_lifecycle",
+      "title": "Subscription lifecycle management",
       "status": "done",
-      "details": "Uses OpenAI/Anthropic, JSON parsing, topic/audience/style parameters"
+      "details": "Create, update, cancel subscriptions with webhook-driven synchronization"
     },
     {
-      "id": "slide_api",
-      "title": "Slide generation API endpoints",
+      "id": "admin_api",
+      "title": "Admin API endpoints",
       "status": "done",
-      "details": "POST /generate-outline, POST /generate, auto and manual modes, S3 upload"
+      "details": "User management, subscription management, analytics endpoints with require_admin"
     },
     {
-      "id": "slide_frontend",
-      "title": "Slide builder UI with dual modes",
+      "id": "admin_dashboard",
+      "title": "Admin dashboard UI",
       "status": "done",
-      "details": "AI generate mode, manual entry mode, dynamic slides, preview, responsive design"
+      "details": "Overview with metrics, user management, analytics, responsive design"
+    },
+    {
+      "id": "usage_analytics",
+      "title": "Usage analytics and reporting",
+      "status": "done",
+      "details": "Total users, revenue, usage by type, job stats, per-user usage summary"
     }
   ],
   "completed_phases": [
@@ -89,13 +95,20 @@
       "status": "completed",
       "completed_at": "2025-11-12",
       "notes": "python-pptx for PPTX, Playwright for PDF, AI-powered outline generation, dual-mode UI"
+    },
+    {
+      "phase": 8,
+      "name": "Plans, Quotas, Admin Dashboard & Payments (Stripe)",
+      "status": "completed",
+      "completed_at": "2025-11-12",
+      "notes": "Stripe integration, quota enforcement, admin API endpoints, analytics dashboard, subscription lifecycle"
     }
   ],
-  "last_updated": "2025-11-12T20:00:00Z",
-  "notes": "✅ Phase 7 COMPLETE - Slide maker with AI-powered outline generation and PPTX/PDF export fully functional!",
+  "last_updated": "2025-11-12T22:00:00Z",
+  "notes": "✅ Phase 8 COMPLETE - Full subscription management with Stripe payments, comprehensive quota system, and admin dashboard!",
   "next_phase": {
-    "phase": 8,
-    "name": "Plans, Quotas, Admin Dashboard, Payments (Stripe)",
+    "phase": 9,
+    "name": "Observability, Security, Rate Limiting",
     "status": "ready"
   }
 }

@@ -521,4 +521,92 @@
 
 ---
 
+### Phase 8: Plans, Quotas, Admin Dashboard & Payments (Stripe) - COMPLETED ✅
+
+**Time**: 2025-11-12
+
+**Action**: Implemented complete subscription management system with Stripe payments, quota enforcement, and admin dashboard
+
+**Changes**:
+
+**Stripe Integration:**
+- ✅ Stripe payment service with checkout sessions
+- ✅ Customer portal for subscription management
+- ✅ Webhook handling for subscription events
+- ✅ Checkout completed → create/update subscription
+- ✅ Subscription updated → sync status and period
+- ✅ Subscription deleted → mark as cancelled
+- ✅ Stripe schemas (checkout, portal, webhooks)
+- ✅ Stripe routes (`/create-checkout-session`, `/create-portal-session`, `/webhook`)
+
+**Quota System:**
+- ✅ Comprehensive quota checking utilities
+- ✅ `check_chat_quota()`: Token-based limits with pre-check
+- ✅ `check_image_quota()`: Per-image generation limits
+- ✅ `check_video_quota()`: Video duration limits (seconds)
+- ✅ `check_cv_quota()`: CV export limits
+- ✅ `check_slide_quota()`: Slide export limits
+- ✅ `get_user_subscription()`: Validates active subscription and expiry
+- ✅ `QuotaError` exception with limit and usage details
+- ✅ Increment functions for all usage types
+- ✅ `get_usage_summary()`: Complete usage breakdown with percentages
+- ✅ Plan limits: Starter (100K tokens), Plus (500K tokens), Pro (2M tokens)
+
+**Subscription Lifecycle:**
+- ✅ Create subscription via Stripe checkout
+- ✅ Update subscription (plan changes via customer portal)
+- ✅ Cancel subscription (via API or Stripe portal)
+- ✅ Webhook-driven status synchronization
+- ✅ Period start/end tracking
+- ✅ Usage counter resets on renewal
+
+**Admin API Endpoints:**
+- ✅ `GET /admin/users` - List all users with pagination and search
+- ✅ `GET /admin/users/{id}` - User details with subscription and usage
+- ✅ `PATCH /admin/users/{id}` - Update user (activate/deactivate, admin role)
+- ✅ `DELETE /admin/users/{id}` - Delete user
+- ✅ `GET /admin/subscriptions` - List subscriptions with filters (status, plan)
+- ✅ `PATCH /admin/subscriptions/{id}` - Update subscription (plan, status, period)
+- ✅ `GET /admin/analytics` - Platform analytics dashboard
+- ✅ `require_admin` dependency for admin-only routes
+
+**Admin Dashboard UI:**
+- ✅ Overview tab with key metrics cards:
+  - Total users
+  - Active subscriptions
+  - Monthly revenue
+  - Total events
+- ✅ Subscriptions by plan breakdown
+- ✅ Usage by type statistics
+- ✅ Job statistics by type and status
+- ✅ Users tab with table view:
+  - User details (name, email, status, role, created date)
+  - Activate/deactivate actions
+  - Status and role badges
+- ✅ Responsive design with Tailwind CSS
+- ✅ Clean, modern admin interface
+
+**Analytics & Reporting:**
+- ✅ Total users count
+- ✅ Active subscriptions count
+- ✅ Monthly revenue calculation
+- ✅ Usage events by type aggregation
+- ✅ Subscription distribution by plan
+- ✅ Job statistics by type and status
+- ✅ Usage summary per user with percentages
+
+**Configuration:**
+- ✅ Stripe API keys in environment variables
+- ✅ Stripe price IDs for plans (starter, plus, pro)
+- ✅ Webhook secret for signature verification
+- ✅ Updated `.env.example` with Stripe configuration
+
+**Status**: ✅ Phase 8 COMPLETE - Full subscription management with Stripe payments, quota enforcement, and admin dashboard
+
+**Next Steps**:
+- Phase 9: Observability, Security hardening, Rate limiting refinement
+- Phase 10: Production readiness
+
+---
+
 

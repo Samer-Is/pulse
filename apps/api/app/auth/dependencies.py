@@ -103,3 +103,25 @@ def require_auth(user: User = Depends(get_current_user)) -> User:
     """
     return user
 
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """
+    Dependency to require admin role.
+    
+    Args:
+        user: Current authenticated user
+        
+    Returns:
+        User if admin
+        
+    Raises:
+        HTTPException: If not admin
+    """
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    
+    return user
+

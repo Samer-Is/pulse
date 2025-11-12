@@ -39,12 +39,12 @@ export default function Home() {
               Generate presentation slides and export as PPTX/PDF
             </p>
           </Link>
-          <div className="p-6 border rounded-lg">
+          <Link href="/admin" className="p-6 border rounded-lg hover:border-blue-500 hover:shadow-md transition">
             <h2 className="text-xl font-semibold mb-2">Admin</h2>
             <p className="text-sm text-muted-foreground">
               Manage users, subscriptions, and monitor usage
             </p>
-          </div>
+          </Link>
         </div>
       </div>
     </main>

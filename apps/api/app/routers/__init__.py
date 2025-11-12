@@ -10,6 +10,8 @@ from .images import router as images_router
 from .videos import router as videos_router
 from .cv import router as cv_router
 from .slides import router as slides_router
+from .stripe import router as stripe_router
+from .admin import router as admin_router
 from .health import router as health_router
 
 # Create main API router
@@ -25,6 +27,8 @@ api_router.include_router(images_router, prefix="/images", tags=["images"])
 api_router.include_router(videos_router, prefix="/videos", tags=["videos"])
 api_router.include_router(cv_router, prefix="/cv", tags=["cv"])
 api_router.include_router(slides_router, prefix="/slides", tags=["slides"])
+api_router.include_router(stripe_router, prefix="/stripe", tags=["stripe"])
+api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 __all__ = ["api_router"]
 
