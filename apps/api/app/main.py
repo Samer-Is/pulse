@@ -2,9 +2,28 @@
 Pulse AI Studio - FastAPI Backend
 Main application entry point
 """
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+
+from .database import init_db, close_db
+from .routers import api_router
+from .middleware.rate_limit import RateLimitMiddleware
+from .middleware.security import SecurityHeadersMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events."""
+    # Startup
+    await init_db()
+    yield
+    # Shutdown
+    await close_db()
+
 
 app = FastAPI(
     title="Pulse AI Studio API",
@@ -12,16 +31,43 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+# Security Headers Middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate Limiting Middleware
+app.add_middleware(
+    RateLimitMiddleware,
+    calls_limit=100,  # 100 requests
+    period=60,  # per minute
 )
 
 # CORS Configuration
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,https://localhost:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
+
+# Trusted Host Middleware (for production)
+if os.getenv("ENVIRONMENT") == "production":
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=os.getenv("ALLOWED_HOSTS", "*").split(","),
+    )
+
+# Include API router
+app.include_router(api_router)
 
 
 @app.get("/")
@@ -34,12 +80,6 @@ async def root():
             "status": "healthy",
         }
     )
-
-
-@app.get("/health")
-async def health():
-    """Health check endpoint"""
-    return JSONResponse(content={"status": "ok"})
 
 
 if __name__ == "__main__":
